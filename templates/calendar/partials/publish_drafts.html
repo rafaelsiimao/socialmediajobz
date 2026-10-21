@@ -4,7 +4,7 @@ Shows all draft platform posts in a table. Loaded via HTMX into #tab-content.
 {% endcomment %}
 
 <div style="animation: slideUp 200ms cubic-bezier(0.16,1,0.3,1) both">
-    {% if platform_posts %}
+    {% if platform_posts or unassigned_drafts %}
     <table class="w-full">
         <thead>
             <tr class="border-b border-stone-200 text-left">
@@ -67,6 +67,19 @@ Shows all draft platform posts in a table. Loaded via HTMX into #tab-content.
                 <td class="px-4 py-3 text-xs text-stone-500 tabular-nums whitespace-nowrap">
                     {{ pp.post.updated_at|timesince }} ago
                 </td>
+            </tr>
+            {% endfor %}
+            {% for draft in unassigned_drafts %}
+            <tr class="border-b border-stone-100 hover:bg-stone-50 transition-colors duration-100">
+                <td class="px-4 py-3 text-xs text-stone-400">—</td>
+                <td class="px-4 py-3 text-sm text-stone-600 max-w-xs truncate">
+                    <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=draft.id %}" class="hover:underline">
+                        {{ draft.title|default:draft.caption_snippet|default:"(no caption)" }}
+                    </a>
+                </td>
+                <td class="px-4 py-3 text-xs text-stone-400">No channel selected</td>
+                <td class="px-4 py-3 text-xs text-stone-500">{{ draft.author.display_name|default:"-" }}</td>
+                <td class="px-4 py-3 text-xs text-stone-500 whitespace-nowrap">{{ draft.updated_at|timesince }} ago</td>
             </tr>
             {% endfor %}
         </tbody>

@@ -208,7 +208,10 @@ def _get_publish_context(workspace, request):
         "timezone_choices": tz_list,
         "workspace_timezone": ws_tz,
         "queue_count": PlatformPost.objects.filter(post__workspace_id=workspace.id, status="scheduled").count(),
-        "drafts_count": PlatformPost.objects.filter(post__workspace_id=workspace.id, status="draft").count(),
+        "drafts_count": (
+            PlatformPost.objects.filter(post__workspace_id=workspace.id, status="draft").count()
+            + Post.objects.filter(workspace=workspace, platform_posts__isnull=True).count()
+        ),
         "approvals_count": PlatformPost.objects.filter(
             post__workspace_id=workspace.id,
             status__in=["pending_review", "pending_client", "approved", "rejected", "changes_requested"],
@@ -659,6 +662,13 @@ def publish_tab_drafts(request, workspace_id):
     )
     platform_posts = _apply_pp_publish_filters(platform_posts, request)
 
+    unassigned_drafts = _apply_publish_filters(
+        Post.objects.filter(workspace=workspace, platform_posts__isnull=True)
+        .select_related("author")
+        .order_by("-updated_at"),
+        request,
+    )
+
     has_connected_accounts = SocialAccount.objects.filter(
         workspace=workspace,
         connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -669,6 +679,7 @@ def publish_tab_drafts(request, workspace_id):
         "calendar/partials/publish_drafts.html",
         {
             "workspace": workspace,
+            "unassigned_drafts": unassigned_drafts[:200],
             "platform_posts": platform_posts[:200],
             "display_timezone": display_tz,
             "has_connected_accounts": has_connected_accounts,

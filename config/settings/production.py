@@ -2,6 +2,10 @@ from .base import *  # noqa: F401, F403
 
 DEBUG = False
 
+# Templates define Alpine components and HTMX handlers in inline scripts.
+# Flatpickr is loaded from jsDelivr. Keep eval disabled.
+CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net")
+
 # Security
 SECURE_SSL_REDIRECT = True
 SECURE_HSTS_SECONDS = 31536000

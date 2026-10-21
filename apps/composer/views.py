@@ -1323,7 +1323,7 @@ def drafts_list(request, workspace_id):
     # Easiest correct query: any post whose only child statuses are "draft".
     drafts = (
         Post.objects.for_workspace(workspace.id)
-        .filter(platform_posts__status="draft")
+        .filter(models.Q(platform_posts__status="draft") | models.Q(platform_posts__isnull=True))
         .exclude(
             platform_posts__status__in=[
                 "pending_review",
