@@ -1226,7 +1226,7 @@
              hx-get="{% url 'composer:preview' workspace_id=workspace.id %}"
              hx-trigger="previewUpdate from:body"
              hx-include="#composer-form"
-             hx-vals='js:getPreviewVals()'>
+             hx-vals='js:{...getPreviewVals()}'>
             {% include "composer/partials/preview_panel.html" %}
         </div>
     </div>

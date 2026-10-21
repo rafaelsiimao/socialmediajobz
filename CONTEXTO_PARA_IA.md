@@ -4,6 +4,17 @@ Atualizado em 21/10/2026, com base no código local e nas confirmações do usu�
 
 ## Atualização posterior — consultar antes do histórico
 
+Correção da prévia após colaboração: o `hx-vals` do painel usava
+`js:getPreviewVals()`. O HTMX 2.0.4 envolve expressões sem chaves em um objeto,
+produzindo JavaScript inválido (`Unexpected token '}'`) antes da requisição.
+Corrigido para `js:{...getPreviewVals()}`. Reproduzido com HTMX real e Edge
+isolado; teste `tests/browser/preview-request.cjs` verifica requisição com
+imagem sem legenda e atualização posterior da legenda, sem chamadas externas.
+Executar com Node e `playwright` disponível via `node_modules` ou `NODE_PATH`.
+Há também teste Django de prévia com imagem sem legenda no módulo de slides.
+Validação: teste de navegador passou e 34 testes de Composer/colaboração passaram.
+Esta correção de template exige implantar web e atualizar o navegador.
+
 O histórico abaixo foi escrito antes de novas alterações no projeto. A base
 atual passou a ser `02cbee8`, com seleção de aprovador (`e7e96ba`), identidade
 Jobz (`529dcb6`), prévia 4:5 (`0115a47`) e ordenação de slides (`02cbee8`).

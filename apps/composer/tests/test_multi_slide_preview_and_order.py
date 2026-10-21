@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.composer.models import Post, PostMedia
+from apps.composer.models import Post
 from apps.media_library.models import MediaAsset
 from apps.members.models import OrgMembership, WorkspaceMembership
 from apps.organizations.models import Organization
@@ -54,6 +54,18 @@ class MultiSlidePreviewAndOrderTests(TestCase):
             file_size=1024,
             source="upload",
         )
+
+    def test_preview_shows_uploaded_image_without_caption(self):
+        asset = self._create_asset("image_without_caption.png")
+        response = self.client.get(
+            self.preview_url,
+            {"selected_accounts": str(self.ig_account.id), "media_ids": [str(asset.id)]},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["previews"]), 1)
+        self.assertEqual(response.context["previews"][0]["caption"], "")
+        self.assertContains(response, asset.file.url)
+        self.assertNotContains(response, "Nenhuma prévia ainda")
 
     def test_preview_preserves_exact_order_and_count_for_seven_slides(self):
         assets = [self._create_asset(f"slide_{i}.png") for i in range(1, 8)]
