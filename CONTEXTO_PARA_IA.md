@@ -260,6 +260,21 @@ Implementado em 21/10/2026 a pedido do usuário:
    - Implementado Drag-and-drop nativo nos cards de miniaturas para reordenação visual dos slides, atualizando a prévia em tempo real.
    - Criada a suíte de testes `apps/composer/tests/test_multi_slide_preview_and_order.py` (3 testes cobrindo ordem exata de 7 slides na prévia, salvamento com posições corretas e persistência de reordenação).
 
+## LinkedIn Company Pages (Páginas de Empresa)
+
+Implementado em 21/10/2026:
+
+1. **Configuração e Vetting no LinkedIn:**
+   - Criado app dedicado "Social 2 Jobz" no LinkedIn Developer Portal.
+   - Associação com a página "Grupo Jobz" verificada.
+   - Submetido formulário oficial da Community Management API (Development Tier) para aprovação da Microsoft/LinkedIn Vetting Services.
+   - Credenciais cadastradas no EasyPanel (`PLATFORM_LINKEDIN_CLIENT_ID` e `PLATFORM_LINKEDIN_CLIENT_SECRET`).
+2. **Suporte no Sistema (Backend & Providers):**
+   - Em `providers/linkedin_company.py`: implementado `get_user_pages` via `/v2/organizationalEntityAcls` e `/v2/organizations/{id}` para listar as páginas da empresa administradas pelo usuário.
+   - Em `apps/social_accounts/views.py`: fluxo OAuth de `linkedin_company` agora direciona para `select_account`, permitindo selecionar a página desejada com nome e logo.
+   - Em `apps/publisher/engine.py` e `providers/linkedin_company.py`: postagens para `linkedin_company` injetam autoridade como organização (`author = urn:li:organization:<id>`).
+   - Criado `tests/providers/test_linkedin_company.py` (3 testes automatizados cobrindo instanciação, busca de páginas e injeção do autor organização).
+
 ## Outras limitações e pendências
 
 - A tela `templates/credentials/list.html` ainda é um placeholder. As credenciais

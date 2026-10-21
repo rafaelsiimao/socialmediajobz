@@ -256,10 +256,11 @@ def oauth_callback(request, platform):
         tokens = provider.exchange_code(code, redirect_uri)
         profile = provider.get_profile(tokens.access_token)
 
-        # Facebook/Instagram: only connect Pages, not personal profiles
+        # Facebook/Instagram/LinkedIn Company: only connect Pages, not personal profiles
         if platform in (
             PlatformCredential.Platform.FACEBOOK,
             PlatformCredential.Platform.INSTAGRAM,
+            PlatformCredential.Platform.LINKEDIN_COMPANY,
         ) and hasattr(provider, "get_user_pages"):
             pages = provider.get_user_pages(tokens.access_token)
             if pages:
@@ -275,15 +276,21 @@ def oauth_callback(request, platform):
                 }
                 return redirect("social_accounts:select_account")
             else:
-                messages.warning(
-                    request,
-                    "No Facebook Pages were found for your account. "
-                    "Only Pages can be connected — personal profiles are not "
-                    "supported by the Facebook API. "
-                    "If you expected to see a Page, make sure you have admin "
-                    "access and try removing the app in Facebook Settings \u2192 "
-                    "Business Integrations, then reconnect.",
-                )
+                if platform == PlatformCredential.Platform.LINKEDIN_COMPANY:
+                    msg = (
+                        "Nenhuma Página de Empresa (Company Page) foi encontrada no LinkedIn para o seu usuário. "
+                        "Certifique-se de que a sua conta é administradora da página da empresa no LinkedIn."
+                    )
+                else:
+                    msg = (
+                        "No Facebook Pages were found for your account. "
+                        "Only Pages can be connected — personal profiles are not "
+                        "supported by the Facebook API. "
+                        "If you expected to see a Page, make sure you have admin "
+                        "access and try removing the app in Facebook Settings \u2192 "
+                        "Business Integrations, then reconnect."
+                    )
+                messages.warning(request, msg)
                 return redirect("social_accounts:list", workspace_id=workspace_id)
 
         # Standard single-account flow (non-Facebook/Instagram platforms)

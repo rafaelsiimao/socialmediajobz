@@ -299,6 +299,10 @@ _LINKEDIN_CREDENTIALS = {
     "client_id": env("PLATFORM_LINKEDIN_CLIENT_ID", default=""),
     "client_secret": env("PLATFORM_LINKEDIN_CLIENT_SECRET", default=""),
 }
+_LINKEDIN_COMPANY_CREDENTIALS = {
+    "client_id": env("PLATFORM_LINKEDIN_COMPANY_CLIENT_ID", default=env("PLATFORM_LINKEDIN_CLIENT_ID", default="")),
+    "client_secret": env("PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET", default=env("PLATFORM_LINKEDIN_CLIENT_SECRET", default="")),
+}
 
 PLATFORM_CREDENTIALS_FROM_ENV = {
     # Meta platforms - Facebook, Instagram, and Threads share the same app
@@ -307,9 +311,9 @@ PLATFORM_CREDENTIALS_FROM_ENV = {
     "threads": _META_CREDENTIALS,
     # Instagram (Personal) - uses Instagram Login with separate Instagram App credentials
     "instagram_personal": _INSTAGRAM_PERSONAL_CREDENTIALS,
-    # LinkedIn - personal and company page variants share one Community Management API app
+    # LinkedIn - personal and company page variants
     "linkedin_personal": _LINKEDIN_CREDENTIALS,
-    "linkedin_company": _LINKEDIN_CREDENTIALS,
+    "linkedin_company": _LINKEDIN_COMPANY_CREDENTIALS,
     "tiktok": {
         "client_key": env("PLATFORM_TIKTOK_CLIENT_KEY", default=""),
         "client_secret": env("PLATFORM_TIKTOK_CLIENT_SECRET", default=""),
