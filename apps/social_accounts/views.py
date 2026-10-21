@@ -63,7 +63,11 @@ def _build_redirect_uri(request, platform):
     """Build the OAuth callback URL."""
     from django.urls import reverse
 
-    return request.build_absolute_uri(reverse("social_accounts:oauth_callback", kwargs={"platform": platform}))
+    path = reverse("social_accounts:oauth_callback", kwargs={"platform": platform})
+    app_url = getattr(settings, "APP_URL", "").rstrip("/")
+    if app_url:
+        return f"{app_url}{path}"
+    return request.build_absolute_uri(path)
 
 
 def _sign_state(workspace_id, platform, user_id, nonce):
