@@ -20,6 +20,7 @@ from django_ratelimit.decorators import ratelimit
 from apps.common.validators import is_safe_url as _is_safe_url
 from apps.credentials.models import PlatformCredential
 from apps.members.decorators import require_permission
+from providers.exceptions import APIError
 
 from .models import MastodonAppRegistration, SocialAccount
 
@@ -258,7 +259,9 @@ def oauth_callback(request, platform):
         provider = _get_provider_for_platform(platform, request.org.id, **extra_creds)
         redirect_uri = _build_redirect_uri(request, platform)
         tokens = provider.exchange_code(code, redirect_uri)
-        profile = provider.get_profile(tokens.access_token)
+        # Company OAuth only needs organization access, not access to the member's profile.
+        if platform != PlatformCredential.Platform.LINKEDIN_COMPANY:
+            profile = provider.get_profile(tokens.access_token)
 
         # Facebook/Instagram/LinkedIn Company: only connect Pages, not personal profiles
         if platform in (
@@ -310,6 +313,16 @@ def oauth_callback(request, platform):
 
     except (signing.BadSignature, PermissionDenied):
         raise
+    except APIError as exc:
+        logger.exception("OAuth API failed for %s (status %s)", platform, exc.status_code)
+        if platform == PlatformCredential.Platform.LINKEDIN_COMPANY and exc.status_code in (401, 403):
+            messages.error(
+                request,
+                "O LinkedIn recusou o acesso às páginas da empresa. Confira se o aplicativo tem acesso "
+                "à Community Management API e às permissões de organização; depois autorize novamente.",
+            )
+        else:
+            messages.error(request, "Failed to connect account. Please try again.")
     except Exception:
         logger.exception("OAuth callback failed for %s", platform)
         messages.error(

@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import logging
 
-from .exceptions import APIError, PublishError
+from .exceptions import APIError
 from .linkedin import API_BASE, LINKEDIN_HEADERS, LinkedInProvider
-from .types import AccountProfile, PublishContent, PublishResult
+from .types import PublishContent, PublishResult
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +26,6 @@ class LinkedInCompanyProvider(LinkedInProvider):
     @property
     def required_scopes(self) -> list[str]:
         return [
-            "r_basicprofile",
-            "w_member_social",
             "w_organization_social",
             "r_organization_social",
             "rw_organization_admin",
@@ -39,23 +37,19 @@ class LinkedInCompanyProvider(LinkedInProvider):
         Returns a list of dicts each containing id, name, access_token, picture, and handle.
         """
         pages: list[dict] = []
-        try:
-            resp = self._request(
-                "GET",
-                f"{API_BASE}/v2/organizationalEntityAcls",
-                access_token=access_token,
-                headers=LINKEDIN_HEADERS,
-                params={"q": "roleAssignee", "state": "APPROVED"},
-            )
-            data = resp.json()
-            elements = data.get("elements", [])
-        except Exception:
-            logger.exception("Failed to fetch LinkedIn organizationalEntityAcls")
-            elements = []
+        # Let API failures reach the callback: access denied is not an empty page list.
+        resp = self._request(
+            "GET",
+            f"{API_BASE}/rest/organizationAcls",
+            access_token=access_token,
+            headers=LINKEDIN_HEADERS,
+            params={"q": "roleAssignee", "state": "APPROVED"},
+        )
+        elements = resp.json().get("elements", [])
 
         seen_org_ids = set()
         for elem in elements:
-            target = elem.get("organizationalTarget", "")
+            target = elem.get("organization") or elem.get("organizationalTarget", "")
             if not target:
                 continue
             # target format: urn:li:organization:12345678 or urn:li:organizationBrand:12345678
@@ -70,7 +64,7 @@ class LinkedInCompanyProvider(LinkedInProvider):
             try:
                 org_resp = self._request(
                     "GET",
-                    f"{API_BASE}/v2/organizations/{org_id}",
+                    f"{API_BASE}/rest/organizations/{org_id}",
                     access_token=access_token,
                     headers=LINKEDIN_HEADERS,
                 )
@@ -81,7 +75,7 @@ class LinkedInCompanyProvider(LinkedInProvider):
                     or f"Organization {org_id}"
                 )
                 vanity_name = org_data.get("vanityName", "")
-            except Exception:
+            except APIError:
                 logger.warning("Could not fetch details for LinkedIn organization %s", org_id)
                 org_name = f"Organization {org_id}"
 

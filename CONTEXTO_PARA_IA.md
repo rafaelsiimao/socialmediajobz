@@ -4,6 +4,28 @@ Atualizado em 21/10/2026, com base no código local e nas confirmações do usu�
 
 ## Atualização posterior — consultar antes do histórico
 
+LinkedIn Company Page (21/10/2026): usuário relata janela do LinkedIn com
+"Bummer, something went wrong" antes de retornar ao site. Esse texto genérico
+não confirma a causa; falta conferir Products/Community Management API, Auth,
+redirect URI e permissões aprovadas no aplicativo real. Solicitar captura de
+Products sem expor Client Secret. Callback esperado:
+`https://socialmedia-web.hqzarv.easypanel.host/social-accounts/callback/linkedin_company/`.
+
+Falhas de código reproduzidas e corrigidas em testes isolados: callback de
+Company dependia de `/v2/me`; removida essa dependência e os scopes pessoais
+`r_basicprofile`/`w_member_social` desse provider. Mantém
+`w_organization_social`, `r_organization_social`, `rw_organization_admin`.
+Busca agora `/rest/organizationAcls` (campo `organization`, com tolerância ao
+campo antigo) e `/rest/organizations/{id}`. Erros de API não viram mais lista
+vazia; 401/403 no callback exibem orientação específica sobre acesso.
+Header compartilhado `LinkedIn-Version` atualizado de 202401 para 202601,
+versão ativa conferida na documentação oficial; reavaliar antes de 15/01/2027.
+Não houve teste com token real, publicação ou confirmação de implantação.
+Validação local: 141 testes de providers/contas sociais/OAuth passaram e lint passou.
+Referências: https://learn.microsoft.com/en-us/linkedin/marketing/increasing-access
+e https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/organization-access-control-by-role
+e https://learn.microsoft.com/en-us/linkedin/marketing/integrations/migrations?view=li-lms-2026-01
+
 Correção da prévia após colaboração: o `hx-vals` do painel usava
 `js:getPreviewVals()`. O HTMX 2.0.4 envolve expressões sem chaves em um objeto,
 produzindo JavaScript inválido (`Unexpected token '}'`) antes da requisição.

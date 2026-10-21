@@ -34,7 +34,7 @@ API_BASE = "https://api.linkedin.com"
 
 # Required headers for LinkedIn REST API
 LINKEDIN_HEADERS = {
-    "LinkedIn-Version": "202401",
+    "LinkedIn-Version": "202601",
     "X-Restli-Protocol-Version": "2.0.0",
 }
 
