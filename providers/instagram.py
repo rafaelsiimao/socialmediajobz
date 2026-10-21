@@ -79,6 +79,10 @@ class InstagramProvider(SocialProvider):
     @property
     def required_scopes(self) -> list[str]:
         return [
+            # Resolve the professional Instagram account via /me/accounts.
+            "pages_show_list",
+            "pages_read_engagement",
+            "business_management",
             "instagram_basic",
             "instagram_content_publish",
             "instagram_manage_comments",

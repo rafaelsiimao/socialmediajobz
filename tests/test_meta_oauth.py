@@ -5,6 +5,14 @@ from django.urls import reverse
 
 from apps.members.models import WorkspaceMembership
 from apps.workspaces.models import Workspace
+from providers.instagram import InstagramProvider
+
+
+def test_instagram_requests_page_discovery_permissions():
+    provider = InstagramProvider({"app_id": "test-app", "app_secret": "test-secret"})
+    query = parse_qs(urlsplit(provider.get_auth_url("https://example.com/callback/", "test-state")).query)
+    scopes = set(query["scope"][0].split(","))
+    assert {"pages_show_list", "pages_read_engagement", "business_management", "instagram_basic"} <= scopes
 
 
 @pytest.mark.django_db
