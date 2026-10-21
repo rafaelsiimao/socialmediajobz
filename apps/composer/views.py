@@ -487,6 +487,71 @@ def _transition_post_children(post, target, *, allow_via_draft=True, only=None):
     return moved, skipped
 
 
+def _sync_post_media(request, post, workspace):
+    """Synchronize media attachments from explicit form IDs or pending session."""
+    from apps.media_library.models import MediaAsset
+
+    session_key = f"pending_media_{workspace.id}"
+    pending_ids = [str(x) for x in request.session.get(session_key, []) if x]
+
+    raw_media_ids = request.POST.getlist("media_ids")
+    if not raw_media_ids:
+        raw_media_ids = request.POST.getlist("pending_media_ids")
+
+    media_ids = [str(m).strip() for m in raw_media_ids if str(m).strip()]
+
+    # If no media_ids passed in form, fallback to pending session media
+    if not media_ids and pending_ids:
+        media_ids = list(pending_ids)
+
+    # Also append any new pending_ids that might have arrived during upload
+    for pid in pending_ids:
+        if pid not in media_ids:
+            media_ids.append(pid)
+
+    if media_ids:
+        assets_map = {
+            str(a.id): a
+            for a in MediaAsset.objects.filter(id__in=media_ids, workspace=workspace)
+        }
+
+        existing_by_asset = {
+            str(pm.media_asset_id): pm
+            for pm in post.media_attachments.all()
+        }
+
+        kept_attachment_ids = []
+        for idx, mid in enumerate(media_ids):
+            asset = assets_map.get(str(mid))
+            if not asset:
+                continue
+            if str(mid) in existing_by_asset:
+                pm = existing_by_asset[str(mid)]
+                if pm.position != idx:
+                    pm.position = idx
+                    pm.save(update_fields=["position"])
+                kept_attachment_ids.append(pm.id)
+            else:
+                new_pm = PostMedia.objects.create(
+                    post=post,
+                    media_asset=asset,
+                    position=idx,
+                )
+                kept_attachment_ids.append(new_pm.id)
+
+        # Remove attachments that are no longer in the list (only if explicit list was submitted)
+        if raw_media_ids or request.POST.get("media_submitted") == "1":
+            post.media_attachments.exclude(id__in=kept_attachment_ids).delete()
+
+        if session_key in request.session:
+            del request.session[session_key]
+    elif request.POST.get("media_submitted") == "1":
+        # Explicitly submitted form with empty media list -> user removed all media
+        post.media_attachments.all().delete()
+        if session_key in request.session:
+            del request.session[session_key]
+
+
 def _platform_status_map(post):
     """Return ``{platform_post_id: status}`` for HTMX response headers."""
     return {str(pp.id): pp.status for pp in post.platform_posts.all()}
@@ -667,24 +732,8 @@ def save_post(request, workspace_id, post_id=None):
 
     post.save()
 
-    # Attach pending session media for new posts
-    if not post_id:
-        from apps.media_library.models import MediaAsset as _MediaAsset
-
-        session_key = f"pending_media_{workspace.id}"
-        pending_ids = request.session.get(session_key, [])
-        if pending_ids:
-            for idx, asset_id in enumerate(pending_ids):
-                try:
-                    asset = _MediaAsset.objects.get(id=asset_id, workspace=workspace)
-                    PostMedia.objects.get_or_create(
-                        post=post,
-                        media_asset=asset,
-                        defaults={"position": idx},
-                    )
-                except _MediaAsset.DoesNotExist:
-                    continue
-            del request.session[session_key]
+    # Sync media attachments
+    _sync_post_media(request, post, workspace)
 
     # Sync any new tags to the Tag model
     _sync_tags_to_model(workspace, post.tags)
@@ -843,24 +892,8 @@ def autosave(request, workspace_id, post_id=None):
 
     post.save()
 
-    # Attach pending session media when creating a new post
-    if is_new:
-        from apps.media_library.models import MediaAsset
-
-        session_key = f"pending_media_{workspace.id}"
-        pending_ids = request.session.get(session_key, [])
-        if pending_ids:
-            for idx, asset_id in enumerate(pending_ids):
-                try:
-                    asset = MediaAsset.objects.get(id=asset_id, workspace=workspace)
-                    PostMedia.objects.get_or_create(
-                        post=post,
-                        media_asset=asset,
-                        defaults={"position": idx},
-                    )
-                except MediaAsset.DoesNotExist:
-                    continue
-            del request.session[session_key]
+    # Synchronize media attachments from form state or pending session
+    _sync_post_media(request, post, workspace)
 
     # Sync platform selections
     selected_ids_str = request.POST.get("selected_accounts", "")
@@ -923,40 +956,68 @@ def preview(request, workspace_id):
                 }
             )
 
-    # Gather media for preview - check pending session media or post attachments
+    # Gather media for preview - prioritize explicit media_ids passed from client DOM
     from apps.media_library.models import MediaAsset
 
     media_items = []
-    post_id_str = request.GET.get("_autosave_post_id", "")
 
-    if post_id_str:
-        try:
-            post_obj = Post.objects.get(id=post_id_str, workspace=workspace)
-            for att in post_obj.media_attachments.select_related("media_asset").all():
-                asset = att.media_asset
+    raw_media_ids = request.GET.getlist("media_ids") or request.GET.getlist("media_ids[]")
+    if not raw_media_ids:
+        raw_media_ids = request.GET.getlist("pending_media_ids") or request.GET.getlist("pending_media_ids[]")
+
+    client_media_ids = [str(m).strip() for m in raw_media_ids if str(m).strip()]
+
+    if client_media_ids:
+        assets_map = {
+            str(a.id): a
+            for a in MediaAsset.objects.filter(id__in=client_media_ids, workspace=workspace)
+        }
+        for mid in client_media_ids:
+            asset = assets_map.get(str(mid))
+            if asset and asset.file:
                 media_items.append(
                     {
-                        "url": asset.file.url if asset.file else "",
+                        "url": asset.file.url,
                         "is_video": asset.is_video,
                         "filename": asset.filename,
                     }
                 )
+
+    post_id_str = request.GET.get("_autosave_post_id", "")
+    if not media_items and post_id_str:
+        try:
+            post_obj = Post.objects.get(id=post_id_str, workspace=workspace)
+            for att in post_obj.media_attachments.select_related("media_asset").order_by("position"):
+                asset = att.media_asset
+                if asset and asset.file:
+                    media_items.append(
+                        {
+                            "url": asset.file.url,
+                            "is_video": asset.is_video,
+                            "filename": asset.filename,
+                        }
+                    )
         except Post.DoesNotExist:
             pass
 
     if not media_items:
-        # Check session pending media
         session_key = f"pending_media_{workspace.id}"
-        pending_ids = request.session.get(session_key, [])
+        pending_ids = [str(x) for x in request.session.get(session_key, []) if x]
         if pending_ids:
-            for asset in MediaAsset.objects.filter(id__in=pending_ids, workspace=workspace):
-                media_items.append(
-                    {
-                        "url": asset.file.url if asset.file else "",
-                        "is_video": asset.is_video,
-                        "filename": asset.filename,
-                    }
-                )
+            assets_map = {
+                str(a.id): a
+                for a in MediaAsset.objects.filter(id__in=pending_ids, workspace=workspace)
+            }
+            for pid in pending_ids:
+                asset = assets_map.get(str(pid))
+                if asset and asset.file:
+                    media_items.append(
+                        {
+                            "url": asset.file.url,
+                            "is_video": asset.is_video,
+                            "filename": asset.filename,
+                        }
+                    )
 
     return render(
         request,
@@ -1327,8 +1388,11 @@ def remove_pending_media(request, workspace_id, asset_id):
         with contextlib.suppress(Exception):
             delete_asset(asset)
 
-    # Return updated pending list
-    pending_assets = MediaAsset.objects.filter(id__in=pending, workspace=workspace)
+    # Return updated pending list in exact order
+    assets_map = {
+        str(a.id): a for a in MediaAsset.objects.filter(id__in=pending, workspace=workspace)
+    }
+    pending_assets = [assets_map[pid] for pid in pending if pid in assets_map]
     return render(
         request,
         "composer/partials/media_list_pending.html",

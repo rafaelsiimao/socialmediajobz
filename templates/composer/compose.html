@@ -300,6 +300,7 @@
               @htmx:after-request="onFormSaved($event)"
               class="flex flex-col flex-1 min-h-0">
             <input type="hidden" name="selected_accounts" :value="selectedAccounts.join(',')">
+            <input type="hidden" name="media_submitted" value="1">
 
             <div class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 panel-scroll relative" style="z-index: 0;">
 
@@ -1205,7 +1206,7 @@
              hx-get="{% url 'composer:preview' workspace_id=workspace.id %}"
              hx-trigger="previewUpdate from:body"
              hx-include="#composer-form"
-             hx-vals='js:{"title": document.querySelector("input[name=title]")?.value || "", "caption": document.querySelector("[name=caption]")?.value || "", "selected_accounts": document.querySelector("[name=selected_accounts]")?.value || "", "_autosave_post_id": document.querySelector("[name=_autosave_post_id]")?.value || ""}'>
+             hx-vals='js:getPreviewVals()'>
             {% include "composer/partials/preview_panel.html" %}
         </div>
     </div>
@@ -1601,6 +1602,20 @@ function composerApp() {
                     this.uploadUrl = `/workspace/{{ workspace.id }}/compose/${detail.postId}/upload-media/`;
                 }
             });
+
+            this.$nextTick(() => {
+                initMediaListSortable();
+            });
+
+            // Prevent autosave while uploads are pending or in progress
+            const trigger = document.getElementById('autosave-trigger');
+            if (trigger) {
+                trigger.addEventListener('htmx:configRequest', (evt) => {
+                    if (this.isUploading || (this.uploadQueue && this.uploadQueue.length > 0)) {
+                        evt.preventDefault();
+                    }
+                });
+            }
         },
 
         toggleAccount(id) {
@@ -1763,7 +1778,13 @@ function composerApp() {
         },
 
         _processQueue() {
-            if (this.isUploading || this.uploadQueue.length === 0) return;
+            if (this.uploadQueue.length === 0) {
+                this.isUploading = false;
+                initMediaListSortable();
+                document.body.dispatchEvent(new CustomEvent('previewUpdate'));
+                return;
+            }
+            if (this.isUploading) return;
             this.isUploading = true;
             const file = this.uploadQueue.shift();
             this.uploadFile(file);
@@ -1851,6 +1872,7 @@ function composerApp() {
                             });
                         }
                     }
+                    initMediaListSortable();
                     document.body.dispatchEvent(new CustomEvent('previewUpdate'));
                 } else {
                     self._showUploadError(thumb, file);
@@ -1898,6 +1920,59 @@ function composerApp() {
     };
 }
 
+function getPreviewVals() {
+    const mediaInputs = document.querySelectorAll('#media-list input[name="media_ids"]');
+    const mediaIds = Array.from(mediaInputs).map(i => i.value).filter(Boolean);
+    return {
+        "title": document.querySelector("input[name=title]")?.value || "",
+        "caption": document.querySelector("[name=caption]")?.value || "",
+        "selected_accounts": document.querySelector("[name=selected_accounts]")?.value || "",
+        "_autosave_post_id": document.querySelector("[name=_autosave_post_id]")?.value || "",
+        "media_ids": mediaIds
+    };
+}
+
+function initMediaListSortable() {
+    const list = document.getElementById('media-list');
+    if (!list) return;
+
+    let draggedItem = null;
+
+    list.querySelectorAll('.media-thumb').forEach(thumb => {
+        if (thumb.dataset.sortableInitialized === 'true') return;
+        thumb.dataset.sortableInitialized = 'true';
+        thumb.setAttribute('draggable', 'true');
+
+        thumb.addEventListener('dragstart', (e) => {
+            draggedItem = thumb;
+            thumb.classList.add('opacity-40');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        thumb.addEventListener('dragend', () => {
+            if (draggedItem) {
+                draggedItem.classList.remove('opacity-40');
+                draggedItem = null;
+            }
+            document.body.dispatchEvent(new CustomEvent('previewUpdate'));
+        });
+
+        thumb.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (!draggedItem || draggedItem === thumb) return;
+
+            const rect = thumb.getBoundingClientRect();
+            const midX = rect.left + rect.width / 2;
+            if (e.clientX < midX) {
+                list.insertBefore(draggedItem, thumb);
+            } else {
+                list.insertBefore(draggedItem, thumb.nextSibling);
+            }
+        });
+    });
+}
+
 async function removePendingMedia(assetId, url, btn) {
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
         || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
@@ -1909,6 +1984,7 @@ async function removePendingMedia(assetId, url, btn) {
         if (resp.ok) {
             const html = await resp.text();
             document.getElementById('media-list').innerHTML = html;
+            initMediaListSortable();
             document.body.dispatchEvent(new CustomEvent('previewUpdate'));
         }
     } catch (err) {

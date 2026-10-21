@@ -182,6 +182,21 @@ Implementado em 21/10/2026 a pedido do usuário:
    - Criado `tests/test_approvals_assignment.py` (4 testes passando: revisor específico, fallback geral, reenvio com memória de revisor e renderização de e-mail com botão de ação).
    - Testes de regressão (109 testes) e checagem de sistema Django passaram sem erros.
 
+## Múltiplos slides e ordenação no Composer
+
+Implementado em 21/10/2026 a pedido do usuário:
+
+1. **Problema identificado:**
+   - Upload de múltiplos slides (ex.: 7 imagens de carrossel) disparava requisições assíncronas.
+   - O autosave periódico ou salvamento prematuro capturava apenas os primeiros arquivos prontos na sessão e executava `del request.session[key]`, descartando os slides que ainda estavam subindo.
+   - O endpoint de prévia consultava o banco com `id__in`, que em SQL não preserva a ordem do array, gerando slides fora da ordem selecionada.
+2. **Solução implementada:**
+   - Formulário e prévia agora trafegam a lista explícita e ordenada `media_ids` refletindo a ordem real do DOM (`#media-list`).
+   - Criada a função `_sync_post_media` em `apps/composer/views.py`, garantindo persistência da sequência exata (`position = 0, 1, ..., N-1`) em `save_post` e `autosave`.
+   - Adicionada trava no frontend (`htmx:configRequest`) para impedir que o autosave seja disparado enquanto houver uploads em andamento (`isUploading || uploadQueue.length > 0`).
+   - Implementado Drag-and-drop nativo nos cards de miniaturas para reordenação visual dos slides, atualizando a prévia em tempo real.
+   - Criada a suíte de testes `apps/composer/tests/test_multi_slide_preview_and_order.py` (3 testes cobrindo ordem exata de 7 slides na prévia, salvamento com posições corretas e persistência de reordenação).
+
 ## Outras limitações e pendências
 
 - A tela `templates/credentials/list.html` ainda é um placeholder. As credenciais
