@@ -237,6 +237,14 @@ class Post(models.Model):
         blank=True,
         related_name="authored_posts",
     )
+    assigned_reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_posts",
+        help_text="Workspace member assigned to review/approve this post.",
+    )
 
     # Content
     title = models.CharField(max_length=255, blank=True, default="")

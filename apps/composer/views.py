@@ -362,6 +362,13 @@ def compose(request, workspace_id, post_id=None):
     # Workspace tags for the tag dropdown
     all_tags = Tag.objects.for_workspace(workspace.id)
 
+    # Available reviewers for approval workflow
+    available_reviewers = [
+        m.user
+        for m in WorkspaceMembership.objects.filter(workspace=workspace).select_related("user", "custom_role")
+        if m.effective_permissions.get("approve_posts", False)
+    ]
+
     # Build media_items for the initial preview render
     media_items = []
     for att in media_attachments:
@@ -435,6 +442,7 @@ def compose(request, workspace_id, post_id=None):
         "post_comments": post_comments,
         "pending_assets": pending_assets,
         "all_tags": all_tags,
+        "available_reviewers": available_reviewers,
     }
     return render(request, "composer/compose.html", context)
 
@@ -510,6 +518,15 @@ def save_post(request, workspace_id, post_id=None):
     post.workspace = workspace
     if not post_id:
         post.author = request.user
+
+    reviewer_id = request.POST.get("reviewer_id")
+    if reviewer_id:
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        post.assigned_reviewer = User.objects.filter(id=reviewer_id, is_active=True).first()
+    elif "reviewer_id" in request.POST:
+        post.assigned_reviewer = None
 
     # Handle action — note that Post itself no longer carries an editorial
     # status: every transition below operates on the PlatformPost children,
@@ -611,7 +628,7 @@ def save_post(request, workspace_id, post_id=None):
         _save_version(post, request.user)
         from apps.approvals.services import submit_for_review
 
-        submit_for_review(post, request.user, workspace)
+        submit_for_review(post, request.user, workspace, reviewer=post.assigned_reviewer)
         if request.htmx:
             return HttpResponse(
                 status=204,
@@ -628,7 +645,7 @@ def save_post(request, workspace_id, post_id=None):
         _save_version(post, request.user)
         from apps.approvals.services import resubmit_post
 
-        resubmit_post(post, request.user, workspace)
+        resubmit_post(post, request.user, workspace, reviewer=post.assigned_reviewer)
         if request.htmx:
             return HttpResponse(
                 status=204,

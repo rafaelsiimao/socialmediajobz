@@ -948,25 +948,40 @@
                     <span class="hidden sm:inline">Save Draft</span>
                 </button>
 
-                {% if show_submit_button %}
-                <button type="submit" name="action" value="submit_for_approval"
-                        :disabled="selectedAccounts.length === 0"
-                        :class="selectedAccounts.length === 0 && 'opacity-50 cursor-not-allowed'"
-                        class="inline-flex items-center gap-1.5 px-2 sm:px-4 py-2 text-sm font-semibold text-orange-600 hover:text-orange-700 rounded-lg hover:bg-orange-50 transition-all duration-150 cursor-pointer flex-shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <span class="hidden sm:inline">Submit for Approval</span>
-                    <span class="sm:hidden">For Approval</span>
-                </button>
-                {% endif %}
+                {% if show_submit_button or show_resubmit_button %}
+                <div class="inline-flex items-center gap-1 bg-stone-100/70 border border-stone-200 rounded-lg p-0.5 flex-shrink-0">
+                    <select name="reviewer_id" id="reviewer_id"
+                            title="Escolher aprovador"
+                            class="text-xs bg-transparent text-stone-700 font-medium px-2 py-1.5 focus:outline-none cursor-pointer border-r border-stone-200">
+                        <option value="">Qualquer revisor</option>
+                        {% for r in available_reviewers %}
+                        <option value="{{ r.id }}" {% if post and post.assigned_reviewer_id == r.id %}selected{% endif %}>
+                            {{ r.display_name|default:r.email }}
+                        </option>
+                        {% endfor %}
+                    </select>
 
-                {% if show_resubmit_button %}
-                <button type="submit" name="action" value="resubmit_for_approval"
-                        :disabled="selectedAccounts.length === 0"
-                        :class="selectedAccounts.length === 0 && 'opacity-50 cursor-not-allowed'"
-                        class="inline-flex items-center gap-1.5 px-2 sm:px-4 py-2 text-sm font-semibold text-orange-600 hover:text-orange-700 rounded-lg hover:bg-orange-50 transition-all duration-150 cursor-pointer flex-shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
-                    <span class="hidden sm:inline">Resubmit</span>
-                </button>
+                    {% if show_submit_button %}
+                    <button type="submit" name="action" value="submit_for_approval"
+                            :disabled="selectedAccounts.length === 0"
+                            :class="selectedAccounts.length === 0 && 'opacity-50 cursor-not-allowed'"
+                            class="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold text-orange-600 hover:text-orange-700 rounded-md hover:bg-orange-50 transition-all duration-150 cursor-pointer flex-shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span class="hidden sm:inline">Submit for Approval</span>
+                        <span class="sm:hidden">For Approval</span>
+                    </button>
+                    {% endif %}
+
+                    {% if show_resubmit_button %}
+                    <button type="submit" name="action" value="resubmit_for_approval"
+                            :disabled="selectedAccounts.length === 0"
+                            :class="selectedAccounts.length === 0 && 'opacity-50 cursor-not-allowed'"
+                            class="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold text-orange-600 hover:text-orange-700 rounded-md hover:bg-orange-50 transition-all duration-150 cursor-pointer flex-shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>
+                        <span class="hidden sm:inline">Resubmit</span>
+                    </button>
+                    {% endif %}
+                </div>
                 {% endif %}
 
                 <!-- Publish split-button -->

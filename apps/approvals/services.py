@@ -12,7 +12,9 @@ the audit trail remembers exactly which target was acted on.
 
 import logging
 
+from django.conf import settings
 from django.db import transaction
+from django.urls import reverse
 
 from apps.composer.models import PlatformPost, Post
 from apps.members.models import WorkspaceMembership
@@ -77,7 +79,7 @@ def _record_action(post, platform_post, user, action, comment=""):
 # ---------------------------------------------------------------------------
 
 
-def submit_for_review(target, user, workspace):
+def submit_for_review(target, user, workspace, reviewer=None):
     """Submit a post (or single platform post) for internal review."""
     post, targets, is_bundled = _resolve_targets(
         target, eligible_from_states={"draft", "changes_requested", "rejected"}
@@ -91,6 +93,10 @@ def submit_for_review(target, user, workspace):
         if not moved:
             return post
 
+        if reviewer is not None:
+            post.assigned_reviewer = reviewer
+            post.save(update_fields=["assigned_reviewer", "updated_at"])
+
         if is_bundled:
             _record_action(post, None, user, ApprovalAction.ActionType.SUBMITTED)
         else:
@@ -103,21 +109,40 @@ def submit_for_review(target, user, workspace):
             defaults={"reminder_count": 0, "last_reminder_at": None, "escalated": False},
         )
 
-    # Notify all reviewers (members with approve_posts permission)
-    reviewers = WorkspaceMembership.objects.filter(workspace=workspace).select_related("user", "custom_role")
-    for membership in reviewers:
-        perms = membership.effective_permissions
-        if perms.get("approve_posts", False) and membership.user != user:
+    app_url = getattr(settings, "APP_URL", "http://localhost:8000").rstrip("/")
+    action_url = f"{app_url}{reverse('approvals:queue', kwargs={'workspace_id': workspace.id})}"
+
+    # Notify designated reviewer or all reviewers with approve_posts permission
+    target_reviewer = reviewer or post.assigned_reviewer
+    if target_reviewer:
+        if target_reviewer != user:
             notify(
-                user=membership.user,
+                user=target_reviewer,
                 event_type=EventType.POST_SUBMITTED,
                 title="Post submitted for review",
                 body=f'{user.display_name} submitted a post for your review: "{post.caption_snippet}"',
                 data={
                     "post_id": str(post.id),
                     "workspace_id": str(workspace.id),
+                    "action_url": action_url,
                 },
             )
+    else:
+        reviewers = WorkspaceMembership.objects.filter(workspace=workspace).select_related("user", "custom_role")
+        for membership in reviewers:
+            perms = membership.effective_permissions
+            if perms.get("approve_posts", False) and membership.user != user:
+                notify(
+                    user=membership.user,
+                    event_type=EventType.POST_SUBMITTED,
+                    title="Post submitted for review",
+                    body=f'{user.display_name} submitted a post for your review: "{post.caption_snippet}"',
+                    data={
+                        "post_id": str(post.id),
+                        "workspace_id": str(workspace.id),
+                        "action_url": action_url,
+                    },
+                )
 
     return post
 
@@ -249,7 +274,7 @@ def reject_post(target, user, workspace, comment):
     return post
 
 
-def resubmit_post(target, user, workspace):
+def resubmit_post(target, user, workspace, reviewer=None):
     """Resubmit a post or single platform post after changes/rejection."""
     post, targets, is_bundled = _resolve_targets(target, eligible_from_states={"changes_requested", "rejected"})
 
@@ -260,6 +285,10 @@ def resubmit_post(target, user, workspace):
                 moved.append(pp)
         if not moved:
             return post
+
+        if reviewer is not None:
+            post.assigned_reviewer = reviewer
+            post.save(update_fields=["assigned_reviewer", "updated_at"])
 
         if is_bundled:
             _record_action(post, None, user, ApprovalAction.ActionType.RESUBMITTED)
@@ -273,20 +302,40 @@ def resubmit_post(target, user, workspace):
             defaults={"reminder_count": 0, "last_reminder_at": None, "escalated": False},
         )
 
-    reviewers = WorkspaceMembership.objects.filter(workspace=workspace).select_related("user", "custom_role")
-    for membership in reviewers:
-        perms = membership.effective_permissions
-        if perms.get("approve_posts", False) and membership.user != user:
+    app_url = getattr(settings, "APP_URL", "http://localhost:8000").rstrip("/")
+    action_url = f"{app_url}{reverse('approvals:queue', kwargs={'workspace_id': workspace.id})}"
+
+    # Notify designated reviewer or all reviewers with approve_posts permission
+    target_reviewer = reviewer or post.assigned_reviewer
+    if target_reviewer:
+        if target_reviewer != user:
             notify(
-                user=membership.user,
+                user=target_reviewer,
                 event_type=EventType.POST_SUBMITTED,
                 title="Post resubmitted for review",
                 body=f'{user.display_name} resubmitted a post: "{post.caption_snippet}"',
                 data={
                     "post_id": str(post.id),
                     "workspace_id": str(workspace.id),
+                    "action_url": action_url,
                 },
             )
+    else:
+        reviewers = WorkspaceMembership.objects.filter(workspace=workspace).select_related("user", "custom_role")
+        for membership in reviewers:
+            perms = membership.effective_permissions
+            if perms.get("approve_posts", False) and membership.user != user:
+                notify(
+                    user=membership.user,
+                    event_type=EventType.POST_SUBMITTED,
+                    title="Post resubmitted for review",
+                    body=f'{user.display_name} resubmitted a post: "{post.caption_snippet}"',
+                    data={
+                        "post_id": str(post.id),
+                        "workspace_id": str(workspace.id),
+                        "action_url": action_url,
+                    },
+                )
 
     return post
 
