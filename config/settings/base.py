@@ -258,7 +258,7 @@ CSP_FONT_SRC = ("'self'",)
 CSP_CONNECT_SRC = ("'self'",)
 # Meta connections POST to our app, then redirect to Facebook for consent.
 # Browsers also enforce form-action on that redirect destination.
-CSP_FORM_ACTION = ("'self'", "https://accounts.google.com", "https://www.facebook.com")
+CSP_FORM_ACTION = ("'self'", "https://accounts.google.com", "https://www.facebook.com", "https://www.linkedin.com", "https://linkedin.com")
 
 # Media Library
 MEDIA_LIBRARY_MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20MB

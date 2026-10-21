@@ -1,7 +1,11 @@
 from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from django.urls import reverse
 
+from apps.members.models import WorkspaceMembership
+from apps.workspaces.models import Workspace
 from providers import get_provider
 from providers.linkedin_company import LinkedInCompanyProvider
 from providers.types import PublishContent, PostType
@@ -64,3 +68,26 @@ def test_publish_post_injects_organization_author(mock_publish_text):
     assert mock_publish_text.called
     author_arg = mock_publish_text.call_args[0][1]
     assert author_arg == "urn:li:organization:123456"
+
+
+@pytest.mark.django_db
+def test_linkedin_company_connect_redirect_is_allowed_by_csp(client, settings, org_owner, organization):
+    settings.CSP_REPORT_ONLY = False
+    settings.PLATFORM_CREDENTIALS_FROM_ENV = {
+        "linkedin_company": {"client_id": "test-linkedin-id", "client_secret": "test-secret"}
+    }
+    workspace = Workspace.objects.create(organization=organization, name="LinkedIn workspace")
+    WorkspaceMembership.objects.create(
+        user=org_owner, workspace=workspace, workspace_role=WorkspaceMembership.WorkspaceRole.OWNER
+    )
+    client.force_login(org_owner)
+    response = client.post(
+        reverse("social_accounts:connect", kwargs={"workspace_id": workspace.id}),
+        {"platform": "linkedin_company"},
+    )
+    assert response.status_code == 302
+    target = urlsplit(response["Location"])
+    assert target.netloc == "www.linkedin.com"
+    policy = response["Content-Security-Policy"]
+    form_action = next(part.strip() for part in policy.split(";") if part.strip().startswith("form-action "))
+    assert "https://www.linkedin.com" in form_action.split()
