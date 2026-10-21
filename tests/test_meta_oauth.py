@@ -4,6 +4,7 @@ import pytest
 from django.urls import reverse
 
 from apps.members.models import WorkspaceMembership
+from apps.social_accounts.models import SocialAccount
 from apps.workspaces.models import Workspace
 from providers.instagram import InstagramProvider
 
@@ -38,3 +39,28 @@ def test_meta_connect_redirect_is_allowed_by_csp(client, settings, org_owner, or
     policy = response["Content-Security-Policy"]
     form_action = next(part.strip() for part in policy.split(";") if part.strip().startswith("form-action "))
     assert "https://www.facebook.com" in form_action.split()
+
+
+@pytest.mark.django_db
+def test_select_facebook_page_preserves_long_avatar_url(client, org_owner, organization):
+    workspace = Workspace.objects.create(organization=organization, name="Facebook workspace")
+    WorkspaceMembership.objects.create(
+        user=org_owner, workspace=workspace, workspace_role=WorkspaceMembership.WorkspaceRole.OWNER
+    )
+    avatar_url = "https://example.com/picture.jpg?signature=" + "a" * 1200
+    # SQLite does not enforce varchar lengths, so also exercise model validation.
+    SocialAccount._meta.get_field("avatar_url").clean(avatar_url, None)
+    client.force_login(org_owner)
+    session = client.session
+    session["oauth_page_select"] = {
+        "workspace_id": str(workspace.id),
+        "platform": "facebook",
+        "user_tokens": {"access_token": "test-user-token", "refresh_token": None},
+        "pages": [{"id": "123", "name": "Test Page", "picture": avatar_url, "access_token": "test-page-token"}],
+    }
+    session.save()
+    response = client.post(reverse("social_accounts:select_account"), {"selected_pages": ["123"]})
+    assert response.status_code == 302
+    account = SocialAccount.objects.get(workspace=workspace, platform="facebook", account_platform_id="123")
+    assert account.avatar_url == avatar_url
+    assert account.oauth_access_token == "test-page-token"
