@@ -1459,7 +1459,7 @@ function composerApp() {
             });
 
             // Trigger preview on page load for existing posts
-            if (this.selectedAccounts.length > 0) {
+            if (this.selectedAccounts.length > 0 || this.autosavedPostId) {
                 this.$nextTick(() => this.triggerPreviewUpdate());
             }
 

@@ -5,8 +5,10 @@ from django.urls import include, path
 
 from apps.accounts.views import health_check
 from apps.approvals.views import org_approval_queue
+from apps.common.media_views import signed_media
 
 urlpatterns = [
+    path("media-file/<path:name>", signed_media, name="signed_media"),
     path("admin/", admin.site.urls),
     path("health/", health_check, name="health_check"),
     path("accounts/", include("apps.accounts.urls")),

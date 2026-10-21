@@ -5,6 +5,10 @@ DEBUG = False
 # Templates use inline scripts and the standard Alpine build, whose expression
 # evaluator requires unsafe-eval. Flatpickr is loaded from jsDelivr.
 CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net")
+CSP_MEDIA_SRC = ("'self'", "blob:", "https:")
+
+if STORAGE_BACKEND == "local":  # noqa: F405
+    STORAGES["default"] = {"BACKEND": "apps.common.storage.SignedMediaStorage"}  # noqa: F405
 
 # Security
 SECURE_SSL_REDIRECT = True

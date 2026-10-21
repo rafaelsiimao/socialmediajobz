@@ -26,3 +26,9 @@ def test_saved_draft_without_channel_appears_in_both_lists(client, org_owner, or
     assert caption.encode() in response.content
     response = client.get(reverse("calendar:publish_tab_drafts", kwargs=kwargs))
     assert caption.encode() in response.content
+    response = client.get(
+        reverse("composer:preview", kwargs=kwargs),
+        {"caption": caption, "_autosave_post_id": str(draft.id)},
+    )
+    assert caption.encode() in response.content
+    assert b"Content preview" in response.content

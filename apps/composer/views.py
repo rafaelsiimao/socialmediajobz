@@ -941,6 +941,8 @@ def preview(request, workspace_id):
             "previews": previews,
             "workspace": workspace,
             "media_items": media_items,
+            "preview_title": title,
+            "preview_caption": caption,
         },
     )
 
