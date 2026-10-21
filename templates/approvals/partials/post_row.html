@@ -16,15 +16,15 @@
             <div class="flex items-center gap-2 mb-1.5">
                 <!-- Status badge -->
                 {% if post.status == 'pending_review' %}
-                <span class="inline-flex items-center px-2 py-0.5 text-[0.6875rem] font-semibold rounded-full bg-orange-50 text-orange-700">Pending Review</span>
+                <span class="inline-flex items-center px-2 py-0.5 text-[0.6875rem] font-semibold rounded-full bg-orange-50 text-orange-700">Revisão Pendente</span>
                 {% elif post.status == 'pending_client' %}
-                <span class="inline-flex items-center px-2 py-0.5 text-[0.6875rem] font-semibold rounded-full bg-amber-50 text-amber-700">Pending Client</span>
+                <span class="inline-flex items-center px-2 py-0.5 text-[0.6875rem] font-semibold rounded-full bg-amber-50 text-amber-700">Cliente Pendente</span>
                 {% elif post.status == 'approved' %}
-                <span class="inline-flex items-center px-2 py-0.5 text-[0.6875rem] font-semibold rounded-full bg-emerald-50 text-emerald-700">Approved</span>
+                <span class="inline-flex items-center px-2 py-0.5 text-[0.6875rem] font-semibold rounded-full bg-emerald-50 text-emerald-700">Aprovado</span>
                 {% elif post.status == 'changes_requested' %}
-                <span class="inline-flex items-center px-2 py-0.5 text-[0.6875rem] font-semibold rounded-full bg-orange-50 text-orange-700">Changes Requested</span>
+                <span class="inline-flex items-center px-2 py-0.5 text-[0.6875rem] font-semibold rounded-full bg-orange-50 text-orange-700">Alterações Solicitadas</span>
                 {% elif post.status == 'rejected' %}
-                <span class="inline-flex items-center px-2 py-0.5 text-[0.6875rem] font-semibold rounded-full bg-red-50 text-red-700">Rejected</span>
+                <span class="inline-flex items-center px-2 py-0.5 text-[0.6875rem] font-semibold rounded-full bg-red-50 text-red-700">Rejeitado</span>
                 {% endif %}
 
                 <!-- Platform icons -->
@@ -79,7 +79,7 @@
                 <!-- Version diff link -->
                 <a href="{% url 'approvals:version_diff' workspace_id=workspace.id post_id=post.id %}"
                    class="text-[0.8125rem] font-medium hover:underline" style="color: var(--primary);">
-                    View Changes
+                    Ver Alterações
                 </a>
             </div>
         </div>
@@ -92,13 +92,13 @@
                     hx-target="#post-row-{{ post.id }}"
                     hx-swap="outerHTML"
                     class="px-3 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-emerald-500 hover:bg-emerald-600 text-white transition-colors">
-                Approve
+                Aprovar
             </button>
 
             <!-- Request Changes (opens modal) -->
             <button @click="showActions = !showActions"
                     class="px-3 py-1.5 text-[0.8125rem] font-semibold rounded-full border border-stone-200 text-stone-600 hover:bg-stone-50 transition-colors">
-                Review
+                Revisar
             </button>
             {% endif %}
         </div>
@@ -109,7 +109,7 @@
         <div class="space-y-3">
             <textarea id="review-comment-{{ post.id }}" rows="2"
                       class="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-transparent resize-none"
-                      placeholder="Add a comment (required for changes/rejection)..."></textarea>
+                      placeholder="Adicione um comentário (obrigatório para alterações/rejeição)..."></textarea>
             <div class="flex gap-2">
                 <button hx-post="{% url 'approvals:request_changes' workspace_id=workspace.id post_id=post.id %}"
                         hx-target="#post-row-{{ post.id }}"
@@ -118,7 +118,7 @@
                         hx-vals='{"comment": ""}'
                         @click="htmx.find('#review-comment-{{ post.id }}').name = 'comment'"
                         class="px-3 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-amber-500 hover:bg-amber-600 text-white transition-colors">
-                    Request Changes
+                    Solicitar Alterações
                 </button>
                 <button hx-post="{% url 'approvals:reject' workspace_id=workspace.id post_id=post.id %}"
                         hx-target="#post-row-{{ post.id }}"
@@ -126,11 +126,11 @@
                         hx-include="#review-comment-{{ post.id }}"
                         @click="htmx.find('#review-comment-{{ post.id }}').name = 'comment'"
                         class="px-3 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors">
-                    Reject
+                    Rejeitar
                 </button>
                 <button @click="showActions = false"
                         class="px-3 py-1.5 text-[0.8125rem] font-medium rounded-full text-stone-500 hover:bg-stone-100 transition-colors ml-auto">
-                    Cancel
+                    Cancelar
                 </button>
             </div>
         </div>

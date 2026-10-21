@@ -14,37 +14,37 @@ All members can view; action buttons shown conditionally based on can_approve pe
                 hx-target="#tab-content" hx-swap="innerHTML"
                 class="px-3.5 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if status_filter == 'all' %}text-white{% else %}text-stone-600 hover:bg-stone-100{% endif %}"
                 {% if status_filter == 'all' %}style="background: var(--primary);"{% endif %}>
-            All <span class="ml-1 opacity-75">{{ pending_review_count|add:pending_client_count|add:approved_count|add:rejected_count|add:changes_requested_count }}</span>
+            Todos <span class="ml-1 opacity-75">{{ pending_review_count|add:pending_client_count|add:approved_count|add:rejected_count|add:changes_requested_count }}</span>
         </button>
         <button hx-get="{% url 'calendar:publish_tab_approvals' workspace_id=workspace.id %}?approval_status=pending_review"
                 hx-target="#tab-content" hx-swap="innerHTML"
                 class="px-3.5 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if status_filter == 'pending_review' %}text-white{% else %}text-stone-600 hover:bg-stone-100{% endif %}"
                 {% if status_filter == 'pending_review' %}style="background: var(--primary);"{% endif %}>
-            Pending Review <span class="ml-1 opacity-75">{{ pending_review_count }}</span>
+            Revisão Pendente <span class="ml-1 opacity-75">{{ pending_review_count }}</span>
         </button>
         <button hx-get="{% url 'calendar:publish_tab_approvals' workspace_id=workspace.id %}?approval_status=pending_client"
                 hx-target="#tab-content" hx-swap="innerHTML"
                 class="px-3.5 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if status_filter == 'pending_client' %}text-white{% else %}text-stone-600 hover:bg-stone-100{% endif %}"
                 {% if status_filter == 'pending_client' %}style="background: var(--primary);"{% endif %}>
-            Pending Client <span class="ml-1 opacity-75">{{ pending_client_count }}</span>
+            Cliente Pendente <span class="ml-1 opacity-75">{{ pending_client_count }}</span>
         </button>
         <button hx-get="{% url 'calendar:publish_tab_approvals' workspace_id=workspace.id %}?approval_status=approved"
                 hx-target="#tab-content" hx-swap="innerHTML"
                 class="px-3.5 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if status_filter == 'approved' %}text-white{% else %}text-stone-600 hover:bg-stone-100{% endif %}"
                 {% if status_filter == 'approved' %}style="background: var(--primary);"{% endif %}>
-            Approved <span class="ml-1 opacity-75">{{ approved_count }}</span>
+            Aprovados <span class="ml-1 opacity-75">{{ approved_count }}</span>
         </button>
         <button hx-get="{% url 'calendar:publish_tab_approvals' workspace_id=workspace.id %}?approval_status=rejected"
                 hx-target="#tab-content" hx-swap="innerHTML"
                 class="px-3.5 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if status_filter == 'rejected' %}text-white{% else %}text-stone-600 hover:bg-stone-100{% endif %}"
                 {% if status_filter == 'rejected' %}style="background: var(--primary);"{% endif %}>
-            Rejected <span class="ml-1 opacity-75">{{ rejected_count }}</span>
+            Rejeitados <span class="ml-1 opacity-75">{{ rejected_count }}</span>
         </button>
         <button hx-get="{% url 'calendar:publish_tab_approvals' workspace_id=workspace.id %}?approval_status=changes_requested"
                 hx-target="#tab-content" hx-swap="innerHTML"
                 class="px-3.5 py-1.5 text-[0.8125rem] font-medium rounded-full transition-colors {% if status_filter == 'changes_requested' %}text-white{% else %}text-stone-600 hover:bg-stone-100{% endif %}"
                 {% if status_filter == 'changes_requested' %}style="background: var(--primary);"{% endif %}>
-            Changes Requested <span class="ml-1 opacity-75">{{ changes_requested_count }}</span>
+            Alterações Solicitadas <span class="ml-1 opacity-75">{{ changes_requested_count }}</span>
         </button>
     </div>
 
@@ -101,9 +101,9 @@ All members can view; action buttons shown conditionally based on can_approve pe
                     </div>
                     <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=pp.post_id %}?account={{ pp.social_account_id }}"
                        class="text-sm text-stone-700 hover:text-stone-900 line-clamp-1">
-                        {{ pp.post.title|default:pp.post.caption_snippet|default:"(no caption)" }}
+                        {{ pp.post.title|default:pp.post.caption_snippet|default:"(sem legenda)" }}
                     </a>
-                    <p class="text-xs text-stone-400 mt-0.5">by {{ pp.post.author.display_name|default:"Unknown" }}</p>
+                    <p class="text-xs text-stone-400 mt-0.5">por {{ pp.post.author.display_name|default:"Desconhecido" }}</p>
                 </div>
                 {% if can_approve %}
                 <div class="flex items-center gap-2 flex-shrink-0">
@@ -112,12 +112,12 @@ All members can view; action buttons shown conditionally based on can_approve pe
                         {% csrf_token %}
                         <button type="submit"
                                 class="px-3 py-1.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors">
-                            Approve
+                            Aprovar
                         </button>
                     </form>
                     <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=pp.post_id %}?account={{ pp.social_account_id }}"
                        class="px-3 py-1.5 text-xs font-semibold rounded-full border border-stone-200 text-stone-600 hover:border-stone-300 transition-colors">
-                        Review
+                        Revisar
                     </a>
                 </div>
                 {% endif %}
@@ -126,8 +126,8 @@ All members can view; action buttons shown conditionally based on can_approve pe
         {% empty %}
         <div class="text-center py-16">
             <svg class="mx-auto w-12 h-12 text-stone-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <p class="text-stone-500 font-medium">No posts pending approval</p>
-            <p class="text-sm text-stone-400 mt-1">Posts submitted for review will appear here</p>
+            <p class="text-stone-500 font-medium">Nenhuma publicação pendente de aprovação</p>
+            <p class="text-sm text-stone-400 mt-1">Publicações enviadas para aprovação aparecerão aqui</p>
         </div>
         {% endfor %}
     </div>
@@ -143,7 +143,7 @@ All members can view; action buttons shown conditionally based on can_approve pe
          x-transition:leave-end="translate-y-full opacity-0"
          class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
         <div class="flex items-center gap-3 px-5 py-3 bg-stone-900 text-white rounded-2xl shadow-xl">
-            <span class="text-sm font-medium" x-text="selectedPosts.length + ' selected'"></span>
+            <span class="text-sm font-medium" x-text="selectedPosts.length + (selectedPosts.length === 1 ? ' selecionado' : ' selecionados')"></span>
             <div class="w-px h-5 bg-stone-700"></div>
             <form hx-post="{% url 'approvals:bulk_action' workspace_id=workspace.id %}"
                   hx-target="#tab-content"
@@ -156,11 +156,11 @@ All members can view; action buttons shown conditionally based on can_approve pe
                 <div class="flex items-center gap-2">
                     <button type="submit" name="action" value="approve"
                             class="px-3.5 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-emerald-500 hover:bg-emerald-600 text-white transition-colors">
-                        Approve All
+                        Aprovar Todos
                     </button>
                     <button type="submit" name="action" value="reject"
                             class="px-3.5 py-1.5 text-[0.8125rem] font-semibold rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors">
-                        Reject All
+                        Rejeitar Todos
                     </button>
                 </div>
             </form>

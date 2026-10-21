@@ -31,4 +31,4 @@ def test_saved_draft_without_channel_appears_in_both_lists(client, org_owner, or
         {"caption": caption, "_autosave_post_id": str(draft.id)},
     )
     assert caption.encode() in response.content
-    assert b"Content preview" in response.content
+    assert "Prévia do conteúdo".encode() in response.content or b"Content preview" in response.content

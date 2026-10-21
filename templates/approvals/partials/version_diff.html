@@ -1,25 +1,25 @@
 <div class="space-y-4">
     {% if diff_data.caption_changed %}
     <div>
-        <h4 class="text-[0.8125rem] font-semibold text-stone-700 mb-2">Caption Changes</h4>
+        <h4 class="text-[0.8125rem] font-semibold text-stone-700 mb-2">Alterações na Legenda</h4>
         <div class="grid grid-cols-2 gap-3">
             <div class="p-3 rounded-lg bg-red-50 border border-red-100">
-                <p class="text-[0.6875rem] font-semibold text-red-600 mb-1">Previous</p>
+                <p class="text-[0.6875rem] font-semibold text-red-600 mb-1">Anterior</p>
                 <p class="text-sm text-stone-700 whitespace-pre-wrap">{{ diff_data.caption_old }}</p>
             </div>
             <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-100">
-                <p class="text-[0.6875rem] font-semibold text-emerald-600 mb-1">Current</p>
+                <p class="text-[0.6875rem] font-semibold text-emerald-600 mb-1">Atual</p>
                 <p class="text-sm text-stone-700 whitespace-pre-wrap">{{ diff_data.caption_new }}</p>
             </div>
         </div>
     </div>
     {% else %}
-    <p class="text-sm text-stone-400">No caption changes</p>
+    <p class="text-sm text-stone-400">Sem alterações na legenda</p>
     {% endif %}
 
     {% if diff_data.media_changed %}
     <div>
-        <h4 class="text-[0.8125rem] font-semibold text-stone-700 mb-2">Media Changes</h4>
+        <h4 class="text-[0.8125rem] font-semibold text-stone-700 mb-2">Alterações na Mídia</h4>
         <div class="grid grid-cols-2 gap-3">
             <div class="p-3 rounded-lg bg-red-50 border border-red-100">
                 <p class="text-[0.6875rem] font-semibold text-red-600 mb-1">Previous ({{ diff_data.media_old|length }} items)</p>
@@ -43,8 +43,8 @@
 
     {% if diff_data.platforms_changed %}
     <div>
-        <h4 class="text-[0.8125rem] font-semibold text-stone-700 mb-2">Platform Changes</h4>
-        <p class="text-sm text-stone-500">Target platforms have been modified.</p>
+        <h4 class="text-[0.8125rem] font-semibold text-stone-700 mb-2">Alterações nos Canais</h4>
+        <p class="text-sm text-stone-500">Os canais de destino foram modificados.</p>
     </div>
     {% endif %}
 </div>

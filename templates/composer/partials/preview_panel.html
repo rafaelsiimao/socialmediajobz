@@ -10,7 +10,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
         <!-- Platform label + char badge -->
         <div class="px-3.5 py-2 border-b flex items-center gap-2" style="border-color: #E7E5E4;">
             {% include "partials/_platform_icon.html" with platform=p.account.platform size="sm" %}
-            <span class="text-[11px] font-semibold text-stone-500 flex-1">{{ p.account.platform|title }} Preview</span>
+            <span class="text-[11px] font-semibold text-stone-500 flex-1">Prévia do {{ p.account.platform|title }}</span>
             <span class="text-[10px] font-semibold tabular-nums px-2 py-0.5 rounded-full
                          {% if p.is_over_limit %}bg-red-50 text-red-600{% else %}bg-stone-100 text-stone-500{% endif %}">
                 {{ p.char_count }}/{{ p.char_limit }}
@@ -517,7 +517,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
         {% if p.is_over_limit %}
         <div class="px-3 py-2 border-t border-red-100 bg-red-50/50 flex items-center gap-1.5 text-[11px] font-medium text-red-500">
             <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
-            Caption exceeds {{ p.char_limit }} character limit
+            A legenda excede o limite de {{ p.char_limit }} caracteres
         </div>
         {% endif %}
     </div>
@@ -526,8 +526,8 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
 {% elif media_items or preview_caption or preview_title %}
     <div class="preview-card bg-white rounded-xl overflow-hidden border border-stone-200">
         <div class="px-4 py-3 border-b border-stone-100">
-            <p class="text-sm font-semibold text-stone-700">Content preview</p>
-            <p class="text-xs text-stone-400">Connect a channel for a platform-specific preview.</p>
+            <p class="text-sm font-semibold text-stone-700">Prévia do conteúdo</p>
+            <p class="text-xs text-stone-400">Conecte uma rede social para ver a prévia específica.</p>
         </div>
         {% if preview_title %}<h3 class="px-4 pt-4 font-semibold text-stone-800">{{ preview_title }}</h3>{% endif %}
         {% if preview_caption %}<div class="p-4 whitespace-pre-wrap break-words text-sm text-stone-700">{{ preview_caption }}</div>{% endif %}
@@ -547,8 +547,8 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             <svg class="w-7 h-7 text-stone-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
         </div>
         <p class="text-sm font-medium text-stone-500 mb-1"
-           style="animation: slideUp 400ms 80ms cubic-bezier(0.16,1,0.3,1) both">No preview yet</p>
+           style="animation: slideUp 400ms 80ms cubic-bezier(0.16,1,0.3,1) both">Nenhuma prévia ainda</p>
         <p class="text-xs text-stone-400 max-w-[200px]"
-           style="animation: slideUp 400ms 140ms cubic-bezier(0.16,1,0.3,1) both">Select a platform and start writing to see how your post will look</p>
+           style="animation: slideUp 400ms 140ms cubic-bezier(0.16,1,0.3,1) both">Selecione uma rede e comece a escrever para ver como sua publicação vai ficar</p>
     </div>
 {% endif %}

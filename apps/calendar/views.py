@@ -44,6 +44,15 @@ COMMON_TIMEZONES = [
     "America/New_York",
 ]
 
+MONTHS_PT = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+]
+DAYS_PT = [
+    "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira",
+    "Sexta-feira", "Sábado", "Domingo"
+]
+
 
 def _slots_updated_response(account_id):
     """Return a 204 response with an HX-Trigger header for slot grid refresh."""
@@ -388,11 +397,11 @@ def _month_view_data(request, workspace, target_date, context):
         .order_by("effective_at")
     )
 
-    # Also include drafts without scheduled_at for the current month
+    # Also include drafts/approved posts without scheduled_at for the current month
     drafts = (
         _get_filtered_posts(workspace, request)
         .filter(
-            platform_posts__status="draft",
+            platform_posts__status__in=["draft", "approved"],
             scheduled_at__isnull=True,
         )
         .distinct()
@@ -450,11 +459,11 @@ def _month_view_data(request, workspace, target_date, context):
     context.update(
         {
             "calendar_weeks": calendar_weeks,
-            "period_label": date(year, month, 1).strftime("%B %Y"),
+            "period_label": f"{MONTHS_PT[month - 1]} de {year}",
             "prev_date": prev_month.isoformat(),
             "next_date": next_month.isoformat(),
             "unscheduled_drafts": drafts,
-            "day_names": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+            "day_names": ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"],
         }
     )
 
@@ -520,7 +529,7 @@ def _week_view_data(request, workspace, target_date, context):
             "current_hour": now.hour,
             "prev_date": (monday - timedelta(weeks=1)).isoformat(),
             "next_date": (monday + timedelta(weeks=1)).isoformat(),
-            "period_label": f"{week_days[0].strftime('%b %d')} – {week_days[6].strftime('%b %d, %Y')}",
+            "period_label": f"{week_days[0].day} de {MONTHS_PT[week_days[0].month - 1][:3]} – {week_days[6].day} de {MONTHS_PT[week_days[6].month - 1][:3]} de {week_days[6].year}",
         }
     )
 
@@ -574,7 +583,7 @@ def _day_view_data(request, workspace, target_date, context):
             "current_hour": now.hour,
             "prev_date": (target_date - timedelta(days=1)).isoformat(),
             "next_date": (target_date + timedelta(days=1)).isoformat(),
-            "period_label": target_date.strftime("%A, %B %d, %Y"),
+            "period_label": f"{DAYS_PT[target_date.weekday()]}, {target_date.day} de {MONTHS_PT[target_date.month - 1]} de {target_date.year}",
         }
     )
 

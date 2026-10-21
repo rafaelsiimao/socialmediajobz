@@ -1,9 +1,11 @@
+from datetime import timedelta
 import pytest
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
+from django.utils import timezone
 
 from apps.approvals.models import ApprovalAction
-from apps.approvals.services import resubmit_post, submit_for_review
+from apps.approvals.services import approve_post, resubmit_post, submit_for_review
 from apps.composer.models import PlatformPost, Post
 from apps.members.models import WorkspaceMembership
 from apps.notifications.models import EventType, Notification
@@ -146,6 +148,55 @@ def test_resubmit_remembers_assigned_reviewer(org_and_workspace, users_and_membe
 
     assert Notification.objects.filter(user=reviewer1, event_type=EventType.POST_SUBMITTED).count() == 1
     assert Notification.objects.filter(user=reviewer2, event_type=EventType.POST_SUBMITTED).count() == 0
+
+
+@pytest.mark.django_db
+def test_approved_post_with_scheduled_at_becomes_scheduled(org_and_workspace, users_and_memberships, sample_post):
+    _, workspace = org_and_workspace
+    author, reviewer1, _ = users_and_memberships
+    post, pp = sample_post
+
+    # Set scheduled_at
+    target_time = timezone.now() + timedelta(days=2)
+    post.scheduled_at = target_time
+    post.save()
+    pp.scheduled_at = target_time
+    pp.save()
+
+    submit_for_review(post, author, workspace, reviewer=reviewer1)
+    pp.refresh_from_db()
+    assert pp.status == "pending_review"
+
+    # Approve post
+    approve_post(post, reviewer1, workspace)
+
+    pp.refresh_from_db()
+    post.refresh_from_db()
+
+    # Must transition to scheduled and preserve scheduled_at
+    assert pp.status == "scheduled"
+    assert post.status == "scheduled"
+    assert pp.scheduled_at == target_time
+
+
+@pytest.mark.django_db
+def test_approved_post_without_scheduled_at_stays_approved(org_and_workspace, users_and_memberships, sample_post):
+    _, workspace = org_and_workspace
+    author, reviewer1, _ = users_and_memberships
+    post, pp = sample_post
+
+    submit_for_review(post, author, workspace, reviewer=reviewer1)
+    pp.refresh_from_db()
+    assert pp.status == "pending_review"
+
+    # Approve post without scheduled_at
+    approve_post(post, reviewer1, workspace)
+
+    pp.refresh_from_db()
+    post.refresh_from_db()
+
+    assert pp.status == "approved"
+    assert post.status == "approved"
 
 
 @pytest.mark.django_db

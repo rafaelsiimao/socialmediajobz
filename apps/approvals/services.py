@@ -169,6 +169,13 @@ def approve_post(target, user, workspace, comment=""):
             moved.append(pp)
             if two_stage and from_pending_review and _transition_or_skip(pp, "pending_client"):
                 advanced_to_client = True
+            elif not (two_stage and from_pending_review):
+                target_dt = pp.scheduled_at or post.scheduled_at
+                if target_dt:
+                    if not pp.scheduled_at and post.scheduled_at:
+                        pp.scheduled_at = post.scheduled_at
+                        pp.save(update_fields=["scheduled_at"])
+                    _transition_or_skip(pp, "scheduled")
 
         if not moved:
             return post

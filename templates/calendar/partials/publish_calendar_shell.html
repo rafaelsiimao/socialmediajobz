@@ -32,7 +32,7 @@ Toolbar: nav arrows + period + Today + view dropdown | right: filter dropdowns.
 
         <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view={{ view_type }}"
            class="px-3 py-1 text-xs font-semibold text-stone-600 border border-stone-200 rounded-md hover:bg-stone-50 transition-all duration-150 no-underline">
-            Today
+            Hoje
         </a>
 
         <!-- View dropdown (Month/Week/Day) -->
@@ -49,15 +49,15 @@ Toolbar: nav arrows + period + Today + view dropdown | right: filter dropdowns.
                  class="absolute left-0 top-full mt-1 bg-white rounded-lg shadow-lg ring-1 ring-stone-200 py-1 z-50 min-w-[100px]">
                 <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=month&date={{ target_date|date:'Y-m-d' }}"
                    class="block w-full text-left px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors no-underline {% if view_type == 'month' %}text-orange-600 bg-orange-50{% endif %}">
-                    Month
+                    Mês
                 </a>
                 <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=week&date={{ target_date|date:'Y-m-d' }}"
                    class="block w-full text-left px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors no-underline {% if view_type == 'week' %}text-orange-600 bg-orange-50{% endif %}">
-                    Week
+                    Semana
                 </a>
                 <a href="{% url 'calendar:calendar' workspace_id=workspace.id %}?mode=calendar&view=day&date={{ target_date|date:'Y-m-d' }}"
                    class="block w-full text-left px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 transition-colors no-underline {% if view_type == 'day' %}text-orange-600 bg-orange-50{% endif %}">
-                    Day
+                    Dia
                 </a>
             </div>
         </div>
@@ -68,7 +68,7 @@ Toolbar: nav arrows + period + Today + view dropdown | right: filter dropdowns.
             <div class="relative flex-shrink-0">
                 <svg class="cal-filter-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                 <select class="cal-filter-select has-icon" name="status" x-model="calendarFilters.status" @change="reloadCalendar()">
-                    <option value="">All Posts</option>
+                    <option value="">Todas as publicações</option>
                     {% for value, label in status_choices %}
                     <option value="{{ value }}" {% if value in active_filters.statuses %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
@@ -79,7 +79,7 @@ Toolbar: nav arrows + period + Today + view dropdown | right: filter dropdowns.
             <div class="relative flex-shrink-0">
                 <svg class="cal-filter-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 006 0v-1a10 10 0 10-3.92 7.94"/></svg>
                 <select class="cal-filter-select has-icon" name="channel" x-model="calendarFilters.channel" @change="reloadCalendar()">
-                    <option value="">Channels</option>
+                    <option value="">Canais</option>
                     {% for acc in social_accounts %}
                     <option value="{{ acc.id }}">{{ acc.account_name }}</option>
                     {% endfor %}
@@ -136,14 +136,14 @@ Toolbar: nav arrows + period + Today + view dropdown | right: filter dropdowns.
     <!-- Status legend -->
     <div class="px-3 sm:px-4 lg:px-6 pt-4 lg:pt-6">
         <div class="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-2 text-[11px]">
-            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#A8A29E"></span><span style="color:#57534E">Draft</span></span>
-            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#F97316"></span><span style="color:#C2410C">Pending Review</span></span>
-            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#14B8A6"></span><span style="color:#0F766E">Approved</span></span>
-            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#3B82F6"></span><span style="color:#1D4ED8">Scheduled</span></span>
-            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#6366F1"></span><span style="color:#4338CA">Publishing</span></span>
-            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#22C55E"></span><span style="color:#15803D">Published</span></span>
+            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#A8A29E"></span><span style="color:#57534E">Rascunho</span></span>
+            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#F97316"></span><span style="color:#C2410C">Revisão Pendente</span></span>
+            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#14B8A6"></span><span style="color:#0F766E">Aprovado</span></span>
+            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#3B82F6"></span><span style="color:#1D4ED8">Agendado</span></span>
+            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#6366F1"></span><span style="color:#4338CA">Publicando</span></span>
+            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#22C55E"></span><span style="color:#15803D">Publicado</span></span>
             <!-- <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#EAB308"></span><span style="color:#A16207">Partially Published</span></span> -->
-            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#EF4444"></span><span style="color:#B91C1C">Failed</span></span>
+            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md"><span class="w-3 h-3 rounded-full" style="background:#EF4444"></span><span style="color:#B91C1C">Falhou</span></span>
         </div>
     </div>
 </div>

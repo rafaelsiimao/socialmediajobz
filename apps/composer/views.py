@@ -528,6 +528,19 @@ def save_post(request, workspace_id, post_id=None):
     elif "reviewer_id" in request.POST:
         post.assigned_reviewer = None
 
+    # Parse scheduled date and time if provided in form
+    sched_date = form.cleaned_data.get("scheduled_date")
+    sched_time = form.cleaned_data.get("scheduled_time")
+    if sched_date and sched_time:
+        ws_tz = workspace.effective_timezone or "UTC"
+        import zoneinfo
+
+        tz = zoneinfo.ZoneInfo(ws_tz)
+        naive_dt = datetime.combine(sched_date, sched_time)
+        aware_dt = naive_dt.replace(tzinfo=tz)
+        post.scheduled_at = aware_dt
+        post._schedule_propagate_dt = aware_dt
+
     # Handle action — note that Post itself no longer carries an editorial
     # status: every transition below operates on the PlatformPost children,
     # which is why we sync those before/after running it.
@@ -535,24 +548,12 @@ def save_post(request, workspace_id, post_id=None):
     initial_status = "draft"  # default status for newly created PlatformPosts
 
     if action == "schedule":
-        sched_date = form.cleaned_data.get("scheduled_date")
-        sched_time = form.cleaned_data.get("scheduled_time")
         if sched_date and sched_time:
-            ws_tz = workspace.effective_timezone or "UTC"
-            import zoneinfo
-
-            tz = zoneinfo.ZoneInfo(ws_tz)
-            naive_dt = datetime.combine(sched_date, sched_time)
-            aware_dt = naive_dt.replace(tzinfo=tz)
-            if aware_dt <= timezone.now():
+            if post.scheduled_at <= timezone.now():
                 return JsonResponse(
                     {"errors": {"schedule": "Scheduled time must be in the future."}},
                     status=400,
                 )
-            post.scheduled_at = aware_dt
-            # Propagate the manually chosen time to every PlatformPost so all
-            # selected platforms publish at the same moment.
-            post._schedule_propagate_dt = aware_dt  # handled after post.save()
             pending_target = "scheduled"
             initial_status = "scheduled"
         else:
@@ -625,6 +626,9 @@ def save_post(request, workspace_id, post_id=None):
         post.save()
         # Sync platform posts before submitting
         _sync_platform_posts(request, post, workspace, initial_status="draft")
+        propagate_dt = getattr(post, "_schedule_propagate_dt", None)
+        if propagate_dt is not None:
+            post.platform_posts.update(scheduled_at=propagate_dt)
         _save_version(post, request.user)
         from apps.approvals.services import submit_for_review
 
@@ -642,6 +646,9 @@ def save_post(request, workspace_id, post_id=None):
         # Resubmit after changes requested or rejection
         post.save()
         _sync_platform_posts(request, post, workspace, initial_status="draft")
+        propagate_dt = getattr(post, "_schedule_propagate_dt", None)
+        if propagate_dt is not None:
+            post.platform_posts.update(scheduled_at=propagate_dt)
         _save_version(post, request.user)
         from apps.approvals.services import resubmit_post
 
