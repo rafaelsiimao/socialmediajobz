@@ -2,6 +2,58 @@
 
 Atualizado em 21/10/2026, com base no código local e nas confirmações do usuário.
 
+## Atualização posterior — consultar antes do histórico
+
+O histórico abaixo foi escrito antes de novas alterações no projeto. A base
+atual passou a ser `02cbee8`, com seleção de aprovador (`e7e96ba`), identidade
+Jobz (`529dcb6`), prévia 4:5 (`0115a47`) e ordenação de slides (`02cbee8`).
+Portanto, o texto histórico de que não existe seletor de aprovador não descreve
+mais o código atual.
+
+O usuário pediu primeiro a viabilidade de colaboração, música e Stories no
+Instagram e depois autorizou começar SOMENTE pela colaboração.
+
+Implementação de colaboração:
+
+- Campo opcional "Colaboradores" no Composer, por conta `instagram` selecionada
+  (conexão via Facebook Login; não confundir com `instagram_personal`).
+- Até três nomes de usuário, com ou sem `@`, separados por vírgula. Normaliza
+  caixa, remove duplicados e rejeita links/nomes inválidos/mais de três nomes.
+- Salva no `PlatformPost.platform_extra['collaborators']`, também no autosave,
+  nas versões e ao enviar para aprovação. Limpar o campo remove os convidados;
+  uma requisição antiga sem esse campo preserva o valor anterior.
+- O motor já encaminha `platform_extra` ao provider. O provider envia a lista
+  ao criar o contêiner da foto/Reel ou o contêiner PAI do carrossel.
+- Stories e outros formatos não aceitam colaboração: o provider rejeita antes
+  de chamar a API. O aceite do convite continua dependendo do outro perfil.
+- Sem alteração de modelo ou migração. Testes em
+  `tests/test_instagram_collaborators.py`; integrações externas bloqueadas no
+  módulo de teste. Nenhuma publicação real feita para validar a funcionalidade.
+- Vídeos únicos do Instagram com colaboradores são encaminhados como Reels,
+  evitando o fallback genérico de vídeo que não monta o payload REELS.
+- 132 testes de colaboração, aprovação, Composer, OAuth e providers passaram.
+  Build Tailwind passou. Campo conferido no navegador em 1240 px e 390 px,
+  usando banco temporário, sem alterar dados locais de usuários.
+- O lint do código novo passou. `User` dentro de `save_post` já tinha um aviso
+  N806 antes desta alteração; não foi renomeado por ser alheio à funcionalidade.
+
+Ao implantar esta funcionalidade, atualizar tanto web quanto worker no EasyPanel
+e recarregar a interface. Não confundir código publicado com teste real na Meta
+ou implantação confirmada pelo usuário.
+
+Os outros pedidos permanecem pendentes. A documentação oficial consultada indica
+colaboração em fotos/carrosséis/Reels e API de áudio para REELS via Facebook
+Login (catálogo limitado). Há código inicial de Stories, mas automatizar uma nova
+publicação em Story é diferente de compartilhar o post do feed com cartão
+clicável: não prometer esse compartilhamento nativo sem validar a API.
+
+Referências oficiais consultadas:
+
+- https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media/
+- https://developers.facebook.com/docs/instagram-platform/content-publishing/audio-api/
+
+## Histórico da implantação e das primeiras correções
+
 ## Objetivo e comunicação
 
 Rafael está adaptando o BrightBean Studio para gerenciar publicações de redes

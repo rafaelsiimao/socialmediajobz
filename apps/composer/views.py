@@ -24,6 +24,7 @@ from apps.members.decorators import require_permission
 from apps.members.models import WorkspaceMembership
 from apps.social_accounts.models import SocialAccount
 from apps.workspaces.models import Workspace
+from providers.instagram import normalize_collaborators
 
 from .forms import ContentCategoryForm, PostForm
 from .models import (
@@ -53,6 +54,25 @@ def _get_workspace(request, workspace_id):
     if not has_membership:
         raise PermissionDenied("You are not a member of this workspace.")
     return workspace
+
+
+def _instagram_collaborators(request, workspace):
+    selected = [value.strip() for value in request.POST.get("selected_accounts", "").split(",") if value.strip()]
+    accounts = SocialAccount.objects.filter(workspace=workspace, platform="instagram", id__in=selected)
+    return {
+        str(account.id): normalize_collaborators(request.POST[f"ig_collaborators_{account.id}"])
+        for account in accounts
+        if f"ig_collaborators_{account.id}" in request.POST
+    }
+
+
+def _set_collaborators(platform_post, collaborators):
+    extra = dict(platform_post.platform_extra or {})
+    if collaborators:
+        extra["collaborators"] = collaborators
+    else:
+        extra.pop("collaborators", None)
+    platform_post.platform_extra = extra
 
 
 def _sync_platform_posts(request, post, workspace, initial_status=None):
@@ -112,6 +132,9 @@ def _sync_platform_posts(request, post, workspace, initial_status=None):
                 "cover_image_asset_id": request.POST.get(f"pin_cover_image_asset_id_{acc_id}", "").strip() or None,
             }
 
+        collaborators = getattr(request, "instagram_collaborators", {})
+        if account.platform == "instagram" and acc_id in collaborators:
+            _set_collaborators(pp, collaborators[acc_id])
         pp.save()
 
 
@@ -308,6 +331,9 @@ def compose(request, workspace_id, post_id=None):
         }
         for acc in social_accounts
     }
+
+    for account in social_accounts:
+        account.collaborators_csv = ", ".join(platform_extras.get(str(account.id), {}).get("collaborators", []))
 
     # Workspace defaults
     default_first_comment = workspace.default_first_comment
@@ -578,6 +604,11 @@ def save_post(request, workspace_id, post_id=None):
 
     if not form.is_valid():
         return JsonResponse({"errors": form.errors}, status=400)
+
+    try:
+        request.instagram_collaborators = _instagram_collaborators(request, workspace)
+    except ValueError as exc:
+        return JsonResponse({"errors": {"collaborators": [str(exc)]}}, status=400)
 
     post = form.save(commit=False)
     post.workspace = workspace
@@ -859,6 +890,11 @@ def autosave(request, workspace_id, post_id=None):
     """
     workspace = _get_workspace(request, workspace_id)
 
+    try:
+        collaborators = _instagram_collaborators(request, workspace)
+    except ValueError as exc:
+        return JsonResponse({"errors": {"collaborators": [str(exc)]}}, status=400)
+
     is_new = False
     if post_id:
         post = get_object_or_404(Post, id=post_id, workspace=workspace)
@@ -900,10 +936,13 @@ def autosave(request, workspace_id, post_id=None):
     selected_ids = [s.strip() for s in selected_ids_str.split(",") if s.strip()]
     post.platform_posts.exclude(social_account_id__in=selected_ids).delete()
     for acc_id in selected_ids:
-        PlatformPost.objects.get_or_create(
+        platform_post, _ = PlatformPost.objects.get_or_create(
             post=post,
             social_account_id=acc_id,
         )
+        if acc_id in collaborators:
+            _set_collaborators(platform_post, collaborators[acc_id])
+            platform_post.save(update_fields=["platform_extra", "updated_at"])
 
     return HttpResponse(
         f'<span class="text-xs text-gray-400">Saved {timezone.now().strftime("%H:%M")}</span>',

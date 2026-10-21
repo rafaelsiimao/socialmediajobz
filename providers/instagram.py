@@ -7,6 +7,7 @@ uses the Facebook OAuth flow with Instagram-specific scopes.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from datetime import datetime
 from urllib.parse import urlencode
@@ -38,6 +39,30 @@ TOKEN_URL = f"{BASE_URL}/oauth/access_token"
 # Polling settings for container status checks
 CONTAINER_POLL_INTERVAL = 2  # seconds
 CONTAINER_POLL_MAX_ATTEMPTS = 60
+
+
+def normalize_collaborators(value) -> list[str]:
+    """Normalize up to three usernames without truncating or accepting profile URLs."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = re.split(r"[,\s]+", value.strip())
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("Informe nomes de usuário separados por vírgula.")
+    usernames = []
+    for raw in value:
+        if not isinstance(raw, str):
+            raise ValueError("Informe apenas nomes de usuário válidos do Instagram.")
+        username = raw.strip().removeprefix("@").lower()
+        if not username:
+            continue
+        if not re.fullmatch(r"[a-z0-9._]{1,30}", username):
+            raise ValueError("Colaborador inválido. Use o nome de usuário, sem links ou espaços.")
+        if username not in usernames:
+            usernames.append(username)
+    if len(usernames) > 3:
+        raise ValueError("O Instagram permite no máximo 3 colaboradores por publicação.")
+    return usernames
 
 
 class InstagramProvider(SocialProvider):
@@ -190,18 +215,30 @@ class InstagramProvider(SocialProvider):
     # ------------------------------------------------------------------
 
     def publish_post(self, access_token: str, content: PublishContent) -> PublishResult:
+        try:
+            collaborators = normalize_collaborators(content.extra.get("collaborators"))
+        except ValueError as exc:
+            raise PublishError(str(exc), platform=self.platform_name) from exc
+        if collaborators and content.post_type not in (PostType.IMAGE, PostType.CAROUSEL, PostType.REEL):
+            raise PublishError(
+                "Colaboração está disponível apenas para fotos, carrosséis e Reels.", platform=self.platform_name
+            )
         ig_user_id = content.extra.get("ig_user_id") or self._get_ig_user_id(access_token)
 
         if content.post_type == PostType.CAROUSEL:
-            return self._publish_carousel(access_token, ig_user_id, content)
-        return self._publish_single(access_token, ig_user_id, content)
+            return self._publish_carousel(access_token, ig_user_id, content, collaborators=collaborators)
+        return self._publish_single(access_token, ig_user_id, content, collaborators=collaborators)
 
-    def _publish_single(self, access_token: str, ig_user_id: str, content: PublishContent) -> PublishResult:
+    def _publish_single(
+        self, access_token: str, ig_user_id: str, content: PublishContent, *, collaborators=None
+    ) -> PublishResult:
         """Publish a single image, reel, or story."""
         payload: dict = {}
 
         if content.text:
             payload["caption"] = content.text
+        if collaborators:
+            payload["collaborators"] = collaborators
 
         if content.post_type == PostType.REEL:
             payload["media_type"] = "REELS"
@@ -226,7 +263,9 @@ class InstagramProvider(SocialProvider):
         # Step 3: publish
         return self._publish_container(access_token, ig_user_id, container_id)
 
-    def _publish_carousel(self, access_token: str, ig_user_id: str, content: PublishContent) -> PublishResult:
+    def _publish_carousel(
+        self, access_token: str, ig_user_id: str, content: PublishContent, *, collaborators=None
+    ) -> PublishResult:
         """Publish a carousel post with multiple media items."""
         child_ids: list[str] = []
 
@@ -252,6 +291,8 @@ class InstagramProvider(SocialProvider):
         }
         if content.text:
             carousel_payload["caption"] = content.text
+        if collaborators:
+            carousel_payload["collaborators"] = collaborators
 
         carousel_id = self._create_container(access_token, ig_user_id, carousel_payload)
         self._wait_for_container(access_token, carousel_id)

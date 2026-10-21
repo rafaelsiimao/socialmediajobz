@@ -27,9 +27,10 @@ correções, implantação e o ponto em que a conversa parou. Consulte também
 
 ## Estado da tarefa
 
-O usuário pediu este material de passagem de contexto. A próxima necessidade
-de produto em discussão é escolher destinatários para aprovação de posts.
-Essa escolha por publicação ainda NÃO existe e NÃO foi solicitada como
-implementação; não trate a conversa explicativa como uma especificação aprovada.
+O seletor de aprovador já foi implementado em alterações posteriores à criação
+deste guia. O trabalho atual adiciona colaboradores do Instagram por publicação,
+com até três nomes por conta e persistência em `PlatformPost.platform_extra`.
+Música e compartilhamento nos Stories foram discutidos, mas não implementados.
+Consulte a atualização no início do documento de contexto antes do histórico.
 
 Atualize `CONTEXTO_PARA_IA.md` quando houver mudanças importantes confirmadas.
