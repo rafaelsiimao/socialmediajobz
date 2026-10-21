@@ -248,10 +248,10 @@ else:
 # Tailwind
 TAILWIND_APP_NAME = "theme"
 
-# CSP - Using Alpine.js CSP build (@alpinejs/csp) which does not require
-# unsafe-eval. Styles use unsafe-inline because Tailwind utility classes are inline.
+# CSP defaults. Production permits the inline scripts and expression evaluator
+# required by the vendored standard Alpine build.
 CSP_DEFAULT_SRC = ("'self'",)
-CSP_SCRIPT_SRC = ("'self'",)  # Alpine.js CSP build (@alpinejs/csp) eliminates unsafe-eval
+CSP_SCRIPT_SRC = ("'self'",)
 CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")  # Tailwind inline styles
 CSP_IMG_SRC = ("'self'", "data:", "https:")
 CSP_FONT_SRC = ("'self'",)
