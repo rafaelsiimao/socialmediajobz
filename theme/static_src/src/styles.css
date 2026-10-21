@@ -1,5 +1,32 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-50: #EFF6FF;
+  --color-brand-100: #DBEAFE;
+  --color-brand-200: #BFDBFE;
+  --color-brand-300: #93C5FD;
+  --color-brand-400: #66A9FF;
+  --color-brand-500: #1E81FE;
+  --color-brand-600: #1565D8;
+  --color-brand-700: #0F4FB0;
+  --color-brand-800: #0C3E8A;
+  --color-brand-900: #082B61;
+
+  /* Aliasing orange utilities to Jobz Blue palette for consistent white-labeling */
+  --color-orange-50: #EFF6FF;
+  --color-orange-100: #DBEAFE;
+  --color-orange-200: #BFDBFE;
+  --color-orange-300: #93C5FD;
+  --color-orange-400: #66A9FF;
+  --color-orange-500: #1E81FE;
+  --color-orange-600: #1565D8;
+  --color-orange-700: #0F4FB0;
+  --color-orange-800: #0C3E8A;
+  --color-orange-900: #082B61;
+  --color-orange-950: #041B3B;
+}
+
+
 /* Scan all template directories for Tailwind class usage */
 @source "../../../templates/**/*.html";
 @source "../../../apps/**/templates/**/*.html";
@@ -13,17 +40,17 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Brand Tokens - BrightBean Orange */
-  --brand-50:  #FFF7ED;
-  --brand-100: #FFEDD5;
-  --brand-200: #FED7AA;
-  --brand-300: #FDBA74;
-  --brand-400: #FB923C;
-  --brand-500: #F97316;
-  --brand-600: #EA580C;
-  --brand-700: #C2410C;
-  --brand-800: #9A3412;
-  --brand-900: #7C2D12;
+  /* Brand Tokens - Jobz Blue */
+  --brand-50:  #EFF6FF;
+  --brand-100: #DBEAFE;
+  --brand-200: #BFDBFE;
+  --brand-300: #93C5FD;
+  --brand-400: #66A9FF;
+  --brand-500: #1E81FE;
+  --brand-600: #1565D8;
+  --brand-700: #0F4FB0;
+  --brand-800: #0C3E8A;
+  --brand-900: #082B61;
 
   --brand-font-display: Georgia, 'Times New Roman', serif;
   --brand-font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -92,7 +119,7 @@
   --shadow-md:  0 4px 6px rgba(23,20,18,0.06), 0 2px 4px rgba(23,20,18,0.04);
   --shadow-lg:  0 10px 15px rgba(23,20,18,0.08), 0 4px 6px rgba(23,20,18,0.04);
   --shadow-xl:  0 20px 25px rgba(23,20,18,0.08), 0 8px 10px rgba(23,20,18,0.04);
-  --shadow-primary: 0 4px 14px rgba(249,115,22,0.28);
+  --shadow-primary: 0 4px 14px rgba(30,129,254,0.28);
 
   /* Radii */
   --radius-sm:   0.25rem;
@@ -125,7 +152,7 @@ body {
 .auth-bg {
   background-color: var(--surface-1);
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(249,115,22,0.08), transparent),
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(30,129,254,0.08), transparent),
     radial-gradient(ellipse 60% 40% at 100% 100%, rgba(20,184,166,0.04), transparent);
 }
 
@@ -271,7 +298,7 @@ img.sidebar-logo-mark {
 .btn-brand:hover {
   background: var(--primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(249,115,22,0.35);
+  box-shadow: 0 6px 20px rgba(30,129,254,0.35);
 }
 .btn-brand:active {
   transform: translateY(0);
