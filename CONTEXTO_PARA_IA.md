@@ -211,7 +211,7 @@ Resultados registrados, não uma execução nova deste guia:
 - 16 testes de entrega de mídia/prévias/ideias passaram após as correções.
 - 92 testes de OAuth/providers passaram após corrigir scopes do Instagram.
 - 4 testes Meta passaram no último ajuste de avatar, com migração consistente.
-- 202 testes automatizados validados com 100% de sucesso após tradução PT-BR, correção de agendamento, identidade visual Jobz (logo, favicon e cores) e modal de seleção de revisor na aprovação do Composer.
+- 202 testes automatizados validados com 100% de sucesso após tradução PT-BR, correção de agendamento, identidade visual Jobz (logo, favicon e cores), modal de seleção de revisor e proporção 4:5 (1080x1350) adaptativa na prévia do Instagram.
 - Testes de navegador com Playwright/Edge reproduziram o bloqueio do Alpine,
   o redirecionamento CSP e o calendário sem CSS; os respectivos ajustes passaram.
 - Warnings de `staticfiles` ausente nos testes locais foram registrados;
