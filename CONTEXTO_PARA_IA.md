@@ -1,8 +1,26 @@
 # Jobz Social Media — contexto e passagem de trabalho
 
-Atualizado em 21/10/2026, com base no código local e nas confirmações do usuário.
+Atualizado em 22/10/2026, com base no código local e nas confirmações do usuário.
 
 ## Atualização posterior — consultar antes do histórico
+
+LinkedIn Personal (22/10/2026): captura do app "Social Jobz" mostra scopes
+`openid`, `profile`, `w_member_social`, `email`, mas callbacks cadastrados
+incorretamente com `/social-accounts/oauth/callback/`. Os caminhos reais são
+`/social-accounts/callback/linkedin_personal/` e
+`/social-accounts/callback/linkedin_company/`, sem `oauth/` intermediário.
+Orientar ajuste no lápis da seção Authorized redirect URLs e conferir que
+as credenciais desse app estão configuradas para `linkedin_personal`.
+Esse app não mostra scopes de organização; não substitui a aprovação do outro.
+Não recomendar exclusão/recriação como solução para falta de permissões.
+
+Provider pessoal corrigido: solicita `openid`, `profile`, `w_member_social`
+(não precisa email), deixa de pedir `r_basicprofile` e `r_member_social`.
+Perfil obtido em `/v2/userinfo`, usando `sub`, nome e foto; ID ausente é erro.
+Testes novos reproduziram as quatro falhas antes da correção, com HTTP mockado.
+Validação: 145 testes de providers/contas/OAuth passaram; lint do código novo passou.
+Referência: https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2
+Sem autorização real nem publicação. Usuário precisa implantar web/worker.
 
 LinkedIn Company Page (21/10/2026): usuário relata janela do LinkedIn com
 "Bummer, something went wrong" antes de retornar ao site. Esse texto genérico
