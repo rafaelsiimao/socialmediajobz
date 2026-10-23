@@ -99,6 +99,10 @@ Loaded via HTMX into #post-detail-content (modal in calendar.html).
         </div>
         {% endif %}
     </div>
+    {% elif pp.platform_extra.thumbnail_url %}
+    <div class="mx-auto w-full max-w-[280px] aspect-[4/5] bg-stone-100 rounded-xl overflow-hidden">
+        <img src="{{ pp.platform_extra.thumbnail_url }}" alt="" class="w-full h-full object-cover" referrerpolicy="no-referrer">
+    </div>
     {% endif %}
     {% endwith %}
 

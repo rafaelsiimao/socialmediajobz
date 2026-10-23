@@ -21,7 +21,7 @@ class ComposerConfig(AppConfig):
         try:
             from background_task.models import Task
 
-            from apps.composer.tasks import refresh_post_metrics
+            from apps.composer.tasks import refresh_post_metrics, sync_instagram_history
 
             if not Task.objects.filter(verbose_name="refresh_post_metrics").exists():
                 refresh_post_metrics(
@@ -29,5 +29,11 @@ class ComposerConfig(AppConfig):
                     verbose_name="refresh_post_metrics",
                 )
                 logger.info("Registered recurring post-metrics task (every 3h)")
+            if not Task.objects.filter(verbose_name="sync_instagram_history").exists():
+                sync_instagram_history(
+                    repeat=24 * 3600,
+                    verbose_name="sync_instagram_history",
+                )
+                logger.info("Registered daily Instagram history sync")
         except Exception:
             logger.debug("Skipping post-metrics task registration (database not ready)")

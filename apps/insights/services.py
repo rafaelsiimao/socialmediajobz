@@ -121,7 +121,7 @@ def summary(workspace, period, account_id=None):
     followers = accounts.aggregate(total=Sum("follower_count"))["total"] or 0
 
     cards = [
-        ("Posts", current["posts"], _delta(current["posts"], previous["posts"]), "Publicações feitas pelo sistema no período."),
+        ("Posts", current["posts"], _delta(current["posts"], previous["posts"]), "Publicações do período (feitas pelo sistema ou importadas do Instagram)."),
         ("Seguidores", followers, None, "Total atual das contas conectadas (sem histórico de variação ainda)."),
         ("Reações", current["likes"], _delta(current["likes"], previous["likes"]), "Curtidas (Instagram) dos posts do período."),
         ("Comentários", current["comments"], _delta(current["comments"], previous["comments"]), "Comentários nos posts do período."),

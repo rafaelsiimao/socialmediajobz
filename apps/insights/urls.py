@@ -9,4 +9,5 @@ app_name = "insights"
 urlpatterns = [
     path("", views.insights_page, name="page"),
     path("export.csv", views.export_csv, name="export_csv"),
+    path("import-history/", views.import_history, name="import_history"),
 ]

@@ -6,11 +6,22 @@
 {% block page_header %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4 lg:mb-[25px]">
     <h1 class="text-xl sm:text-2xl font-semibold text-stone-900" style="letter-spacing: -0.01em;">Insights</h1>
+    <div class="flex items-center gap-2">
+    <form method="post" action="{% url 'insights:import_history' workspace_id=workspace.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="query" value="{{ query }}">
+        <button type="submit" title="Traz os posts feitos direto no Instagram nos últimos 12 meses"
+                class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium text-stone-700 bg-white border border-stone-200 rounded-full hover:border-stone-300 transition-colors cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Importar posts antigos
+        </button>
+    </form>
     <a href="{% url 'insights:export_csv' workspace_id=workspace.id %}?{{ query }}"
        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium text-stone-700 bg-white border border-stone-200 rounded-full hover:border-stone-300 transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
         Exportar CSV
     </a>
+    </div>
 </div>
 {% endblock %}
 
@@ -127,6 +138,8 @@
                         {% elif not att.media_asset.is_video %}
                         <img src="{{ att.media_asset.file.url }}" alt="" class="w-12 h-12 rounded-lg object-cover flex-shrink-0">
                         {% endif %}
+                        {% elif pp.platform_extra.thumbnail_url %}
+                        <img src="{{ pp.platform_extra.thumbnail_url }}" alt="" class="w-12 h-12 rounded-lg object-cover flex-shrink-0" referrerpolicy="no-referrer">
                         {% endif %}
                         {% endwith %}
                     </div>
@@ -140,7 +153,7 @@
     </section>
 
     <p class="text-xs text-stone-400">
-        Métricas disponíveis apenas para o Instagram e para posts publicados pelo sistema. Stories têm métricas só nas
+        Métricas disponíveis apenas para o Instagram (posts publicados pelo sistema e posts importados). Stories têm métricas só nas
         primeiras 24h. A variação de seguidores ainda não é registrada.
     </p>
 </div>

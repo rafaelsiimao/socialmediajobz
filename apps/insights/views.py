@@ -2,10 +2,13 @@
 
 import csv
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 from apps.composer.models import PlatformPostMetrics
 from apps.members.models import WorkspaceMembership
@@ -126,3 +129,26 @@ def export_csv(request, workspace_id):
             ]
         )
     return response
+
+
+@login_required
+@require_POST
+def import_history(request, workspace_id):
+    """Queue the import of posts made directly in Instagram (last 12 months)."""
+    from apps.composer.tasks import import_instagram_history_task
+
+    workspace = _get_workspace(request, workspace_id)
+    accounts = SocialAccount.objects.filter(
+        workspace=workspace, platform="instagram", connection_status=SocialAccount.ConnectionStatus.CONNECTED
+    )
+    for account in accounts:
+        import_instagram_history_task(str(account.id))
+    if accounts:
+        messages.success(
+            request,
+            "Importação iniciada. Os posts antigos do Instagram aparecem no calendário e aqui em alguns minutos.",
+        )
+    else:
+        messages.error(request, "Nenhuma conta do Instagram conectada neste workspace.")
+    url = reverse("insights:page", kwargs={"workspace_id": workspace.id})
+    return redirect(f"{url}?{request.POST.get('query', '')}")

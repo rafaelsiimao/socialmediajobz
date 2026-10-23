@@ -284,7 +284,18 @@ apenas pela criação deste arquivo.
   sem resposta, sem posts em 7 dias); exportar CSV (`;`, BOM para Excel).
   Números no formato brasileiro (`insights_tags`). Testes em
   `tests/test_insights.py`; conferido no navegador.
-- Pendentes: importação do histórico do Instagram, reformulação do Inbox,
+- **Importação do histórico do Instagram (implementada localmente):**
+  botão "Importar posts antigos" na página Insights enfileira
+  `import_instagram_history_task` por conta Instagram (últimos 12 meses);
+  tarefa diária `sync_instagram_history` traz os posts dos últimos 7 dias.
+  `providers/instagram.py:list_media` pagina `/{ig}/media` (sem Stories).
+  `apps/composer/importer.py` cria Post + PlatformPost publicado (autor
+  vazio) com `platform_extra.imported`, `post_type`, `media_url`,
+  `thumbnail_url`, `permalink`; não duplica mídia já conhecida (posts do
+  sistema) e atualiza URLs dos importados (CDN expira). Busca métricas
+  na importação. Miniatura do Instagram como fallback em calendário,
+  modal e Top 5. Sem migração. Sem teste com conta real.
+- Pendentes: reformulação do Inbox,
   página Início, lembrete de publicação manual
   (stickers), correção das métricas do Facebook.
 

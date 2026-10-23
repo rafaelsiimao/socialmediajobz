@@ -436,6 +436,34 @@ class InstagramProvider(SocialProvider):
     # Analytics
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # History (posts made directly in Instagram)
+    # ------------------------------------------------------------------
+
+    HISTORY_FIELDS = "id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp"
+
+    def list_media(self, access_token: str, since: datetime | None = None, max_items: int = 500) -> list[dict]:
+        """List feed posts and Reels newest first, stopping at ``since``.
+
+        Stories are not returned by this endpoint. Follows ``paging.next``.
+        """
+        ig_user_id = self._get_ig_user_id(access_token)
+        url: str | None = f"{BASE_URL}/{ig_user_id}/media"
+        params: dict | None = {"fields": self.HISTORY_FIELDS, "limit": 50}
+        items: list[dict] = []
+        while url and len(items) < max_items:
+            data = self._request("GET", url, access_token=access_token, params=params).json()
+            params = None  # the "next" URL already carries the query
+            for media in data.get("data", []):
+                timestamp = _parse_ig_time(media["timestamp"])
+                if since and timestamp < since:
+                    return items
+                items.append({**media, "timestamp": timestamp})
+                if len(items) >= max_items:
+                    break
+            url = data.get("paging", {}).get("next")
+        return items
+
     # Media insights metrics per product type. ``impressions``/``engagement``
     # were deprecated by Meta (media created after 2024-07-02 returns an error).
     MEDIA_INSIGHT_METRICS = {
