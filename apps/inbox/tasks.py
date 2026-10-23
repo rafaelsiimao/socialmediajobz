@@ -1,7 +1,9 @@
 """Inbox sync engine - polls connected accounts for new messages."""
 
 import logging
+from datetime import timedelta
 
+from background_task import background
 from django.utils import timezone
 
 from apps.members.models import WorkspaceMembership
@@ -14,6 +16,31 @@ from .models import InboxMessage, InboxSLAConfig
 from .sentiment import analyze_sentiment
 
 logger = logging.getLogger(__name__)
+
+# How far back the first sync of a newly connected account looks.
+INITIAL_SYNC_DAYS = 30
+
+
+def _account_credentials(account):
+    """Per-account IDs the providers need to address the right Page/IG user."""
+    if account.platform == "instagram":
+        return {"ig_user_id": account.account_platform_id}
+    if account.platform == "facebook":
+        return {"page_id": account.account_platform_id}
+    return None
+
+
+@background(schedule=0)
+def run_inbox_sync_cycle():
+    """Poll connected accounts for new inbox messages and check SLAs.
+
+    Registered as a recurring task (every 5 min) in InboxConfig so that
+    ``python manage.py process_tasks`` runs the inbox without a separate
+    ``run_inbox_sync`` process.
+    """
+    engine = InboxSyncEngine()
+    engine.sync_all()
+    engine.check_sla()
 
 
 class InboxSyncEngine:
@@ -34,7 +61,7 @@ class InboxSyncEngine:
     def _sync_account(self, account):
         """Sync messages for a single social account."""
         try:
-            provider = get_provider(account.platform)
+            provider = get_provider(account.platform, _account_credentials(account))
         except ValueError:
             logger.warning("No provider for platform %s", account.platform)
             return
@@ -46,10 +73,15 @@ class InboxSyncEngine:
             .first()
         )
 
+        # First sync of an account: import a recent window silently instead of
+        # notifying the team about every historical comment/DM.
+        initial_sync = last_msg is None
+        since = last_msg or timezone.now() - timedelta(days=INITIAL_SYNC_DAYS)
+
         try:
             messages = provider.get_messages(
                 access_token=account.oauth_access_token,
-                since=last_msg,
+                since=since,
             )
         except NotImplementedError:
             return
@@ -62,9 +94,9 @@ class InboxSyncEngine:
             return
 
         for msg in messages:
-            self._upsert_message(account, msg)
+            self._upsert_message(account, msg, notify_new=not initial_sync)
 
-    def _upsert_message(self, account, msg):
+    def _upsert_message(self, account, msg, notify_new=True):
         """Create or update an inbox message, deduplicating by platform_message_id."""
         obj, created = InboxMessage.objects.update_or_create(
             social_account=account,
@@ -83,7 +115,8 @@ class InboxSyncEngine:
         if created:
             obj.sentiment = analyze_sentiment(obj.body)
             obj.save(update_fields=["sentiment"])
-            self._notify_new_message(obj)
+            if notify_new:
+                self._notify_new_message(obj)
 
     def _notify_new_message(self, message):
         """Send notification for a new inbox message."""

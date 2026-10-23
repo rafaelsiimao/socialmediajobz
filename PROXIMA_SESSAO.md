@@ -142,6 +142,18 @@ apenas pela criação deste arquivo.
   mostra "Métricas ainda não disponíveis". Para retomar: descobrir que tipo
   de objeto é o ID salvo (GET `/{id}?metadata=1` com token da página),
   ajustar `providers/facebook.py` e voltar `facebook` à lista.
+- **Inbox (implementado localmente):** a sincronização nunca rodava na VPS
+  (só existia o comando `run_inbox_sync`, processo separado). Agora é a
+  tarefa recorrente `run_inbox_sync_cycle` (5 min) registrada no
+  post_migrate do app inbox, rodando no worker. Primeira sincronização de
+  cada conta importa 30 dias sem notificar. Instagram: comentários das 25
+  mídias recentes + DMs via `/{page_id}/conversations?platform=instagram`
+  com token da Página; resposta a comentário (`/{comment}/replies`) e a DM
+  (`/{page_id}/messages`, janela de 24h). Scopes adicionados ao login do
+  Instagram: `instagram_manage_messages` e `pages_manage_metadata`; exige
+  RECONECTAR a conta Instagram após o deploy. DMs também exigem ativar no
+  app do Instagram "Ferramentas conectadas / Permitir acesso às mensagens"
+  e, segundo a doc da Meta, empresa verificada. Sem teste com conta real.
 - Pendentes: Stories, importação do histórico do Instagram.
 
 ## Novas funcionalidades planejadas (ordem combinada)

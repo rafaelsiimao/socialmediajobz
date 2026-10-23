@@ -41,6 +41,11 @@ CONTAINER_POLL_INTERVAL = 2  # seconds
 CONTAINER_POLL_MAX_ATTEMPTS = 60
 
 
+def _parse_ig_time(value: str) -> datetime:
+    """Parse Graph API timestamps such as ``2026-10-23T16:50:51+0000``."""
+    return datetime.fromisoformat(value.replace("+0000", "+00:00"))
+
+
 def normalize_collaborators(value) -> list[str]:
     """Normalize up to three usernames without truncating or accepting profile URLs."""
     if value is None:
@@ -112,6 +117,9 @@ class InstagramProvider(SocialProvider):
             "instagram_content_publish",
             "instagram_manage_comments",
             "instagram_manage_insights",
+            # Inbox DMs (read via the linked Page's conversations).
+            "instagram_manage_messages",
+            "pages_manage_metadata",
         ]
 
     @property
@@ -462,42 +470,137 @@ class InstagramProvider(SocialProvider):
     # Inbox
     # ------------------------------------------------------------------
 
-    def get_messages(self, access_token: str, since: datetime | None = None) -> list[InboxMessage]:
-        ig_user_id = self.credentials.get("ig_user_id", "me")
-        params: dict = {"fields": "id,participants,messages{id,message,from,created_time}"}
-        if since:
-            params["since"] = int(since.timestamp())
+    # Recent media scanned for new comments on each sync.
+    INBOX_MEDIA_LIMIT = 25
 
+    def get_messages(self, access_token: str, since: datetime | None = None) -> list[InboxMessage]:
+        """Comments on recent media plus Instagram DMs (via the linked Page).
+
+        DMs need ``instagram_manage_messages``; if the token lacks it, comments
+        are still returned.
+        """
+        ig_user_id = self._get_ig_user_id(access_token)
+        messages = self._get_comments(access_token, ig_user_id, since)
+        try:
+            messages.extend(self._get_direct_messages(access_token, ig_user_id, since))
+        except APIError as exc:
+            logger.warning("Instagram DMs unavailable for %s: %s", ig_user_id, exc)
+        return messages
+
+    def _get_comments(self, access_token: str, ig_user_id: str, since: datetime | None) -> list[InboxMessage]:
         resp = self._request(
             "GET",
-            f"{BASE_URL}/{ig_user_id}/conversations",
+            f"{BASE_URL}/{ig_user_id}/media",
             access_token=access_token,
-            params=params,
+            params={
+                "fields": "id,caption,permalink,comments.limit(50){id,text,timestamp,username,from}",
+                "limit": self.INBOX_MEDIA_LIMIT,
+            },
         )
-        conversations = resp.json().get("data", [])
-
         messages: list[InboxMessage] = []
-        for convo in conversations:
-            for msg in convo.get("messages", {}).get("data", []):
-                sender = msg.get("from", {})
+        for media in resp.json().get("data", []):
+            for comment in media.get("comments", {}).get("data", []):
+                sender = comment.get("from", {})
+                timestamp = _parse_ig_time(comment["timestamp"])
+                if sender.get("id") == ig_user_id or (since and timestamp <= since):
+                    continue
+                username = sender.get("username") or comment.get("username", "")
                 messages.append(
                     InboxMessage(
-                        platform_message_id=msg["id"],
+                        platform_message_id=comment["id"],
                         sender_id=sender.get("id", ""),
-                        sender_name=sender.get("name", sender.get("username", "")),
-                        text=msg.get("message", ""),
-                        timestamp=datetime.fromisoformat(msg["created_time"].replace("+0000", "+00:00")),
-                        message_type="dm",
-                        extra={"conversation_id": convo["id"]},
+                        sender_name=username,
+                        text=comment.get("text", ""),
+                        timestamp=timestamp,
+                        message_type="comment",
+                        extra={
+                            "kind": "comment",
+                            "sender_handle": username,
+                            "media_id": media["id"],
+                            "permalink": media.get("permalink", ""),
+                            "media_caption": (media.get("caption") or "")[:200],
+                        },
                     )
                 )
         return messages
 
+    def _get_direct_messages(self, access_token: str, ig_user_id: str, since: datetime | None) -> list[InboxMessage]:
+        page_id, page_token = self._get_linked_page(access_token, ig_user_id)
+        resp = self._request(
+            "GET",
+            f"{BASE_URL}/{page_id}/conversations",
+            access_token=page_token,
+            params={
+                "platform": "instagram",
+                "fields": "id,updated_time,messages.limit(20){id,message,from,created_time}",
+            },
+        )
+        messages: list[InboxMessage] = []
+        for convo in resp.json().get("data", []):
+            for msg in convo.get("messages", {}).get("data", []):
+                sender = msg.get("from", {})
+                timestamp = _parse_ig_time(msg["created_time"])
+                if sender.get("id") == ig_user_id or (since and timestamp <= since):
+                    continue
+                username = sender.get("username", "")
+                messages.append(
+                    InboxMessage(
+                        platform_message_id=msg["id"],
+                        sender_id=sender.get("id", ""),
+                        sender_name=username,
+                        text=msg.get("message", ""),
+                        timestamp=timestamp,
+                        message_type="dm",
+                        extra={
+                            "kind": "dm",
+                            "sender_handle": username,
+                            "conversation_id": convo["id"],
+                            "page_id": page_id,
+                            "sender_id": sender.get("id", ""),
+                        },
+                    )
+                )
+        return messages
+
+    def _get_linked_page(self, access_token: str, ig_user_id: str) -> tuple[str, str]:
+        """Return (page_id, page_access_token) for the Page linked to this IG account."""
+        resp = self._request(
+            "GET",
+            f"{BASE_URL}/me/accounts",
+            access_token=access_token,
+            params={"fields": "id,access_token,instagram_business_account"},
+        )
+        for page in resp.json().get("data", []):
+            if page.get("instagram_business_account", {}).get("id") == ig_user_id:
+                return page["id"], page["access_token"]
+        raise APIError("No Facebook Page linked to this Instagram account", platform=self.platform_name)
+
     def reply_to_message(self, access_token: str, message_id: str, text: str, extra: dict | None = None) -> ReplyResult:
-        """Reply to a conversation. message_id should be the conversation ID."""
+        """Reply to a comment (public reply) or to a DM (via the linked Page)."""
+        extra = extra or {}
+        if extra.get("kind") == "dm":
+            page_token = (
+                self._request(
+                    "GET",
+                    f"{BASE_URL}/{extra['page_id']}",
+                    access_token=access_token,
+                    params={"fields": "access_token"},
+                )
+                .json()
+                .get("access_token", access_token)
+            )
+            resp = self._request(
+                "POST",
+                f"{BASE_URL}/{extra['page_id']}/messages",
+                access_token=page_token,
+                json={"recipient": {"id": extra["sender_id"]}, "message": {"text": text}},
+            )
+            data = resp.json()
+            return ReplyResult(platform_message_id=data.get("message_id", ""), extra=data)
+
         resp = self._request(
             "POST",
-            f"{BASE_URL}/{message_id}/messages",
+            f"{BASE_URL}/{message_id}/replies",
             access_token=access_token,
             json={"message": text},
         )
