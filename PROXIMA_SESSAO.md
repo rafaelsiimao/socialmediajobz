@@ -134,6 +134,14 @@ apenas pela criação deste arquivo.
   "nonexisting field (shares)" corrigido: posts com foto guardavam o ID da
   foto; agora a publicação guarda o `post_id` do feed e as métricas resolvem
   `page_story_id` para posts antigos (fallback sem `shares` para vídeos).
+- **Facebook desativado no desempenho (corrigir depois):** mesmo após o
+  deploy, log da VPS mostrou `Facebook API error 400: (#100) Tried accessing
+  nonexisting field (shares)` (PlatformPost 24564af8-...). Não confirmado se
+  o log era de antes ou depois do deploy de `bce81ff`. `METRICS_PLATFORMS`
+  em `apps/composer/metrics.py` ficou só com `instagram`; modal do Facebook
+  mostra "Métricas ainda não disponíveis". Para retomar: descobrir que tipo
+  de objeto é o ID salvo (GET `/{id}?metadata=1` com token da página),
+  ajustar `providers/facebook.py` e voltar `facebook` à lista.
 - Pendentes: Stories, importação do histórico do Instagram.
 
 ## Novas funcionalidades planejadas (ordem combinada)

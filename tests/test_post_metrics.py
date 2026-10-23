@@ -256,3 +256,24 @@ def test_facebook_photo_publish_stores_feed_post_id():
         )
 
     assert result.platform_post_id == "page_post"
+
+
+@pytest.mark.django_db
+def test_facebook_posts_are_skipped_while_metrics_are_disabled(client, published_post):
+    workspace, platform_post = published_post
+    fb_account = SocialAccount.objects.create(
+        workspace=workspace, platform="facebook", account_platform_id="fb-page", account_name="Jobz FB"
+    )
+    fb_post = platform_post.post.platform_posts.create(
+        social_account=fb_account, status="published", platform_post_id="photo-1", published_at=timezone.now()
+    )
+    assert fb_post not in list(platform_posts_needing_metrics())
+
+    body = client.get(
+        reverse(
+            "calendar:published_post_detail",
+            kwargs={"workspace_id": workspace.id, "platform_post_id": fb_post.id},
+        )
+    ).content.decode()
+    assert "Métricas ainda não disponíveis" in body
+    assert "Atualizar agora" not in body
