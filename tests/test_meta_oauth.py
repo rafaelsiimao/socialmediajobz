@@ -64,3 +64,28 @@ def test_select_facebook_page_preserves_long_avatar_url(client, org_owner, organ
     account = SocialAccount.objects.get(workspace=workspace, platform="facebook", account_platform_id="123")
     assert account.avatar_url == avatar_url
     assert account.oauth_access_token == "test-page-token"
+
+
+@pytest.mark.django_db
+def test_instagram_login_connect_redirect_is_allowed_by_csp(client, settings, org_owner, organization):
+    settings.CSP_REPORT_ONLY = False
+    settings.PLATFORM_CREDENTIALS_FROM_ENV = {
+        "instagram_personal": {"app_id": "ig-app", "app_secret": "ig-secret"},
+    }
+    workspace = Workspace.objects.create(organization=organization, name="Instagram Login workspace")
+    WorkspaceMembership.objects.create(
+        user=org_owner, workspace=workspace, workspace_role=WorkspaceMembership.WorkspaceRole.OWNER
+    )
+    client.force_login(org_owner)
+    response = client.post(
+        reverse("social_accounts:connect", kwargs={"workspace_id": workspace.id}),
+        {"platform": "instagram_personal"},
+    )
+    assert response.status_code == 302
+    target = urlsplit(response["Location"])
+    assert target.netloc == "api.instagram.com"
+    assert parse_qs(target.query)["client_id"] == ["ig-app"]
+    assert parse_qs(target.query)["redirect_uri"][0].endswith("/social-accounts/callback/instagram_personal/")
+    policy = response["Content-Security-Policy"]
+    form_action = next(part.strip() for part in policy.split(";") if part.strip().startswith("form-action "))
+    assert {"https://api.instagram.com", "https://www.instagram.com"} <= set(form_action.split())

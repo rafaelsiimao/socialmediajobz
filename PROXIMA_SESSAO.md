@@ -97,7 +97,15 @@ apenas pela criação deste arquivo.
 
 ## Status da Meta e LinkedIn (atualizado depois)
 
-- Meta: Rafael iniciou a **Verificação da empresa** (portfólio Kleber Alves,
+- Meta (23/10/2026): **Verificação da empresa APROVADA** — "Verificação para
+  EDUCAVIX EDUCACAO E RECURSOS HUMANOS LTDA", status Verificada. Próximo:
+  voltar a "Enviar para a análise do app" e seguir Configurações do app,
+  Uso permitido, Tratamento de dados e Instruções da análise. Permissões
+  da solicitação conferidas com o código: todas usadas (Inbox usa
+  pages_messaging e instagram_manage_messages; métricas usam
+  instagram_manage_insights). read_insights não está pedida (métricas do
+  Facebook desativadas).
+- Meta (histórico): Rafael iniciou a **Verificação da empresa** (portfólio Kleber Alves,
   CNPJ informado por Rafael). Meta pediu aguardar até 48h. Aprovação não
   confirmada. Não enviar a análise do app antes da verificação ser aprovada.
 - Enquanto isso: conferir política de privacidade e URL de exclusão de dados
@@ -305,6 +313,20 @@ apenas pela criação deste arquivo.
   Cores das séries = paleta categórica validada da skill dataviz, fixas
   por canal. Filtro por tags não incluído (JSON `contains` não funciona no
   SQLite dos testes; avaliar no PostgreSQL). Exportar PDF não incluído.
+- **Decisão (23/10/2026): uso interno, ~3 contas de clientes.** Análise do
+  app pausada (textos prontos em `META_ANALISE_APP.md`). Caminho atual:
+  conector **Instagram (Personal)** = Instagram Login (cliente entra com o
+  próprio Instagram, sem Página/sem conta de desenvolvedor) + clientes como
+  **Testadores do Instagram**. Rafael configurou no app Meta a "API com
+  login do Instagram" (ID do app do Instagram 1645153453661828), redirect
+  `/social-accounts/callback/instagram_personal/` e as variáveis
+  `PLATFORM_INSTAGRAM_APP_ID/SECRET` no EasyPanel. Botão Connect não abria:
+  CSP `form-action` não permitia api.instagram.com/www.instagram.com —
+  corrigido localmente. Lacunas: conector Personal não tem seletor de
+  formato, métricas/Insights, importação nem Inbox estendido (só o
+  conector "instagram" via Facebook). Bug conhecido no conector
+  "instagram" (Facebook Login): conecta e PUBLICA no primeiro Instagram do
+  login (não escolhe conta; engine não injeta ig_user_id).
 - Pendentes: reformulação do Inbox,
   página Início, lembrete de publicação manual
   (stickers), correção das métricas do Facebook.
