@@ -745,6 +745,53 @@ def publish_tab_approvals(request, workspace_id):
     )
 
 
+def _render_published_detail(request, workspace, platform_post_id):
+    platform_post = get_object_or_404(
+        PlatformPost.objects.select_related("post__author", "social_account", "metrics").prefetch_related(
+            "post__media_attachments__media_asset"
+        ),
+        id=platform_post_id,
+        post__workspace_id=workspace.id,
+        status=PlatformPost.Status.PUBLISHED,
+    )
+    from apps.composer.metrics import METRICS_PLATFORMS
+
+    return render(
+        request,
+        "calendar/partials/published_post_detail.html",
+        {
+            "workspace": workspace,
+            "pp": platform_post,
+            "metrics_supported": platform_post.social_account.platform in METRICS_PLATFORMS,
+        },
+    )
+
+
+@login_required
+def published_post_detail(request, workspace_id, platform_post_id):
+    """HTMX partial: read-only preview and performance of a published post."""
+    workspace = _get_workspace(request, workspace_id)
+    return _render_published_detail(request, workspace, platform_post_id)
+
+
+@login_required
+@require_POST
+def published_post_refresh_metrics(request, workspace_id, platform_post_id):
+    """Fetch fresh metrics for one published post and re-render the detail modal."""
+    from apps.composer.metrics import METRICS_PLATFORMS, refresh_platform_post_metrics
+
+    workspace = _get_workspace(request, workspace_id)
+    platform_post = get_object_or_404(
+        PlatformPost.objects.select_related("social_account__workspace"),
+        id=platform_post_id,
+        post__workspace_id=workspace.id,
+        status=PlatformPost.Status.PUBLISHED,
+    )
+    if platform_post.social_account.platform in METRICS_PLATFORMS and platform_post.platform_post_id:
+        refresh_platform_post_metrics(platform_post)
+    return _render_published_detail(request, workspace, platform_post_id)
+
+
 @login_required
 def publish_tab_sent(request, workspace_id):
     """HTMX partial: Sent tab content for the publish page."""

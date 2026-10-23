@@ -1,0 +1,97 @@
+{% comment %}
+Read-only preview and performance of a published PlatformPost.
+Loaded via HTMX into #post-detail-content (modal in calendar.html).
+{% endcomment %}
+<div class="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-stone-100">
+    <div class="flex items-center gap-2 min-w-0">
+        <span class="w-6 h-6 rounded-md flex items-center justify-center pi-{{ pp.social_account.platform }} flex-shrink-0 text-white">
+            {% include "social_accounts/partials/_platform_icon.html" with platform=pp.social_account.platform size="3.5" %}
+        </span>
+        <div class="min-w-0">
+            <p class="text-sm font-semibold text-stone-900 truncate">{{ pp.social_account.account_name }}</p>
+            <p class="text-xs text-stone-500">
+                Publicado {% if pp.published_at %}em {{ pp.published_at|date:"d/m/Y \à\s H:i" }}{% endif %}
+                {% if pp.post.author %} · por {{ pp.post.author.display_name }}{% endif %}
+            </p>
+        </div>
+    </div>
+    <button type="button" @click="$dispatch('close-post-detail')"
+            class="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer" aria-label="Fechar">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+</div>
+
+<div class="overflow-y-auto px-5 py-4 space-y-4" style="max-height: calc(90vh - 80px);">
+    {% with attachments=pp.post.media_attachments.all %}
+    {% if attachments %}
+    <div class="flex gap-2 overflow-x-auto snap-x snap-mandatory rounded-xl">
+        {% for att in attachments %}
+        <div class="snap-center flex-shrink-0 {% if attachments|length > 1 %}w-[85%]{% else %}w-full{% endif %} aspect-[4/5] bg-stone-100 rounded-xl overflow-hidden">
+            {% if att.media_asset.is_video %}
+            <video src="{{ att.media_asset.file.url }}" class="w-full h-full object-cover" controls preload="metadata"></video>
+            {% else %}
+            <img src="{{ att.media_asset.file.url }}" alt="{{ att.alt_text }}" class="w-full h-full object-cover">
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    {% if pp.effective_caption %}
+    <p class="text-sm text-stone-700 whitespace-pre-line break-words">{{ pp.effective_caption }}</p>
+    {% endif %}
+
+    <div>
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-semibold text-stone-400 uppercase tracking-wider">Desempenho</h3>
+            {% if metrics_supported and pp.platform_post_id %}
+            <button type="button"
+                    hx-post="{% url 'calendar:published_post_refresh_metrics' workspace_id=workspace.id platform_post_id=pp.id %}"
+                    hx-target="#post-detail-content" hx-swap="innerHTML"
+                    class="text-xs font-medium text-stone-500 hover:text-stone-900 cursor-pointer inline-flex items-center gap-1">
+                <svg class="w-3.5 h-3.5"fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Atualizar agora
+            </button>
+            {% endif %}
+        </div>
+
+        {% if pp.metrics.fetched_at %}
+        <div class="grid grid-cols-3 gap-2">
+            {% if pp.metrics.views %}
+            <div class="rounded-xl bg-stone-50 px-3 py-2.5"><p class="text-lg font-semibold text-stone-900 tabular-nums">{{ pp.metrics.views }}</p><p class="text-[11px] text-stone-500">Visualizações</p></div>
+            {% endif %}
+            {% if pp.metrics.reach %}
+            <div class="rounded-xl bg-stone-50 px-3 py-2.5"><p class="text-lg font-semibold text-stone-900 tabular-nums">{{ pp.metrics.reach }}</p><p class="text-[11px] text-stone-500">Alcance</p></div>
+            {% endif %}
+            <div class="rounded-xl bg-stone-50 px-3 py-2.5"><p class="text-lg font-semibold text-stone-900 tabular-nums">{{ pp.metrics.likes }}</p><p class="text-[11px] text-stone-500">Curtidas</p></div>
+            <div class="rounded-xl bg-stone-50 px-3 py-2.5"><p class="text-lg font-semibold text-stone-900 tabular-nums">{{ pp.metrics.comments }}</p><p class="text-[11px] text-stone-500">Comentários</p></div>
+            <div class="rounded-xl bg-stone-50 px-3 py-2.5"><p class="text-lg font-semibold text-stone-900 tabular-nums">{{ pp.metrics.shares }}</p><p class="text-[11px] text-stone-500">Compartilhamentos</p></div>
+            {% if pp.social_account.platform == "instagram" %}
+            <div class="rounded-xl bg-stone-50 px-3 py-2.5"><p class="text-lg font-semibold text-stone-900 tabular-nums">{{ pp.metrics.saves }}</p><p class="text-[11px] text-stone-500">Salvamentos</p></div>
+            {% endif %}
+            {% if pp.metrics.interactions %}
+            <div class="rounded-xl bg-stone-50 px-3 py-2.5"><p class="text-lg font-semibold text-stone-900 tabular-nums">{{ pp.metrics.interactions }}</p><p class="text-[11px] text-stone-500">Interações</p></div>
+            {% endif %}
+        </div>
+        <p class="mt-2 text-[11px] text-stone-400">Atualizado em {{ pp.metrics.fetched_at|date:"d/m \à\s H:i" }}</p>
+        {% if pp.metrics.last_error %}
+        <p class="mt-1 text-[11px] text-amber-600">Algumas métricas não vieram da rede: {{ pp.metrics.last_error|truncatechars:160 }}</p>
+        {% endif %}
+        {% elif not metrics_supported %}
+        <p class="text-sm text-stone-400">Métricas ainda não disponíveis para esta rede.</p>
+        {% elif pp.metrics.last_error %}
+        <p class="text-sm text-amber-600">Não foi possível buscar as métricas: {{ pp.metrics.last_error|truncatechars:200 }}</p>
+        {% else %}
+        <p class="text-sm text-stone-400">Aguardando a primeira atualização das métricas.</p>
+        {% endif %}
+    </div>
+
+    {% if pp.metrics.raw.permalink %}
+    <a href="{{ pp.metrics.raw.permalink }}" target="_blank" rel="noopener noreferrer"
+       class="inline-flex items-center gap-1 text-sm font-medium text-stone-700 hover:text-stone-900">
+        Ver na rede social
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+    </a>
+    {% endif %}
+</div>

@@ -142,3 +142,62 @@ def test_refresh_records_error_without_raising(published_post):
 
     assert snapshot.fetched_at is None
     assert "token expired" in snapshot.last_error
+
+
+@pytest.mark.django_db
+def test_published_post_opens_detail_modal_with_metrics(client, published_post):
+    workspace, platform_post = published_post
+    PlatformPostMetrics.objects.create(
+        platform_post=platform_post,
+        likes=42,
+        reach=99,
+        fetched_at=timezone.now(),
+        raw={"permalink": "https://www.instagram.com/p/abc/"},
+    )
+    detail_url = reverse(
+        "calendar:published_post_detail",
+        kwargs={"workspace_id": workspace.id, "platform_post_id": platform_post.id},
+    )
+
+    calendar_page = client.get(reverse("calendar:calendar", kwargs={"workspace_id": workspace.id}), {"view": "month"})
+    assert detail_url in calendar_page.content.decode()
+
+    body = client.get(detail_url).content.decode()
+    assert "Publicado" in body and "Desempenho" in body
+    assert "42" in body and "99" in body
+    assert "https://www.instagram.com/p/abc/" in body
+
+
+@pytest.mark.django_db
+def test_detail_modal_rejects_unpublished_and_other_workspaces(client, published_post, organization):
+    workspace, platform_post = published_post
+    url = reverse(
+        "calendar:published_post_detail",
+        kwargs={"workspace_id": workspace.id, "platform_post_id": platform_post.id},
+    )
+    platform_post.status = "scheduled"
+    platform_post.save(update_fields=["status"])
+    assert client.get(url).status_code == 404
+
+    other = Workspace.objects.create(organization=organization, name="Other")
+    other_url = reverse(
+        "calendar:published_post_detail",
+        kwargs={"workspace_id": other.id, "platform_post_id": platform_post.id},
+    )
+    assert client.get(other_url).status_code in (403, 404)
+
+
+@pytest.mark.django_db
+def test_refresh_button_fetches_metrics(client, published_post):
+    workspace, platform_post = published_post
+    fake_provider = MagicMock()
+    fake_provider.get_post_metrics.return_value = PostMetrics(likes=7, comments=1, extra={})
+    with patch("apps.composer.metrics.get_provider", return_value=fake_provider):
+        response = client.post(
+            reverse(
+                "calendar:published_post_refresh_metrics",
+                kwargs={"workspace_id": workspace.id, "platform_post_id": platform_post.id},
+            )
+        )
+    assert response.status_code == 200
+    assert PlatformPostMetrics.objects.get(platform_post=platform_post).likes == 7

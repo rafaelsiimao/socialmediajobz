@@ -20,7 +20,13 @@ Shows all published/partially_published platform posts. Loaded via HTMX into #ta
         <tbody>
             {% for pp in platform_posts %}
             <tr class="border-b border-stone-100 hover:bg-stone-50 transition-colors duration-100 cursor-pointer"
-                onclick="window.location='{% url 'composer:compose_edit' workspace_id=workspace.id post_id=pp.post_id %}?account={{ pp.social_account_id }}'">
+                {% if pp.status == "published" %}
+                hx-get="{% url 'calendar:published_post_detail' workspace_id=workspace.id platform_post_id=pp.id %}"
+                hx-target="#post-detail-content" hx-swap="innerHTML"
+                @click="$dispatch('open-post-detail')"
+                {% else %}
+                onclick="window.location='{% url 'composer:compose_edit' workspace_id=workspace.id post_id=pp.post_id %}?account={{ pp.social_account_id }}'"
+                {% endif %}>
                 <td class="px-4 py-3">
                     {% with first_att=pp.post.media_attachments.all.0 %}
                     {% if first_att %}
@@ -79,7 +85,7 @@ Shows all published/partially_published platform posts. Loaded via HTMX into #ta
                         {% if pp.metrics.shares %}<span title="Compartilhamentos">↗ {{ pp.metrics.shares }}</span>{% endif %}
                         {% if pp.metrics.saves %}<span title="Salvamentos">🔖 {{ pp.metrics.saves }}</span>{% endif %}
                     </div>
-                    <span class="text-[10px] text-stone-400">Atualizado {{ pp.metrics.fetched_at|timesince }} atrás</span>
+                    <span class="text-[10px] text-stone-400">Atualizado em {{ pp.metrics.fetched_at|date:"d/m \à\s H:i" }}</span>
                     {% elif pp.status == "published" %}
                     <span class="text-stone-300" title="{{ pp.metrics.last_error|default:'Aguardando a próxima atualização' }}">Aguardando métricas</span>
                     {% else %}

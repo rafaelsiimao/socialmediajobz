@@ -122,6 +122,12 @@ apenas pela criação deste arquivo.
   lê só reações/comentários/compartilhamentos do post (insights exigem
   `read_insights`, que o app não pede). 166 testes passaram, lint ok.
   Sem teste com token real. Exige deploy de web E worker (migração).
+  Commit `44ea419`.
+- Modal de post publicado: clicar num post publicado (calendário ou aba
+  Enviados) abre prévia somente leitura + desempenho + "Atualizar agora" +
+  link "Ver na rede social" (permalink). Rotas `calendar:published_post_detail`
+  e `published_post_refresh_metrics`. Conferido no navegador com banco
+  temporário; 169 testes passaram.
 - Pendentes: Stories, importação do histórico do Instagram.
 
 ## Novas funcionalidades planejadas (ordem combinada)

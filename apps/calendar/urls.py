@@ -27,6 +27,16 @@ urlpatterns = [
     path("publish/drafts/", views.publish_tab_drafts, name="publish_tab_drafts"),
     path("publish/approvals/", views.publish_tab_approvals, name="publish_tab_approvals"),
     path("publish/sent/", views.publish_tab_sent, name="publish_tab_sent"),
+    path(
+        "published/<uuid:platform_post_id>/",
+        views.published_post_detail,
+        name="published_post_detail",
+    ),
+    path(
+        "published/<uuid:platform_post_id>/refresh/",
+        views.published_post_refresh_metrics,
+        name="published_post_refresh_metrics",
+    ),
     # Custom Calendar Events
     path("events/create/", views.event_create, name="event_create"),
     path("events/<uuid:event_id>/edit/", views.event_edit, name="event_edit"),

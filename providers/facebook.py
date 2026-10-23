@@ -316,7 +316,7 @@ class FacebookProvider(SocialProvider):
             f"{BASE_URL}/{post_id}",
             access_token=access_token,
             params={
-                "fields": "shares,comments.summary(true).limit(0),reactions.summary(true).limit(0)",
+                "fields": "permalink_url,shares,comments.summary(true).limit(0),reactions.summary(true).limit(0)",
             },
         ).json()
         reactions = data.get("reactions", {}).get("summary", {}).get("total_count", 0)
@@ -328,7 +328,7 @@ class FacebookProvider(SocialProvider):
             comments=comments,
             shares=shares,
             engagements=reactions + comments + shares,
-            extra={"raw_fields": data},
+            extra={"raw_fields": data, "permalink": data.get("permalink_url", "")},
         )
 
     def get_account_metrics(self, access_token: str, date_range: tuple[datetime, datetime]) -> AccountMetrics:

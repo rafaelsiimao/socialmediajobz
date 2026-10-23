@@ -392,7 +392,7 @@ class InstagramProvider(SocialProvider):
             "GET",
             f"{BASE_URL}/{post_id}",
             access_token=access_token,
-            params={"fields": "like_count,comments_count,media_product_type"},
+            params={"fields": "like_count,comments_count,media_product_type,permalink"},
         ).json()
         product_type = media.get("media_product_type") or "FEED"
         metrics = self.MEDIA_INSIGHT_METRICS.get(product_type, self.MEDIA_INSIGHT_METRICS["FEED"])
@@ -424,6 +424,7 @@ class InstagramProvider(SocialProvider):
             extra={
                 "raw_insights": values,
                 "media_product_type": product_type,
+                "permalink": media.get("permalink", ""),
                 "insights_error": insights_error,
             },
         )
