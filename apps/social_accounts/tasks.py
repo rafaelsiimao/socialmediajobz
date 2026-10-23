@@ -18,7 +18,7 @@ def check_social_account_health(account_id: str):
     """
     from providers import get_provider
 
-    from .models import SocialAccount
+    from .models import FollowerSnapshot, SocialAccount
 
     try:
         account = SocialAccount.objects.get(id=account_id)
@@ -82,6 +82,11 @@ def check_social_account_health(account_id: str):
     try:
         profile = provider.get_profile(account.oauth_access_token)
         account.follower_count = profile.follower_count
+        FollowerSnapshot.objects.update_or_create(
+            social_account=account,
+            date=timezone.localdate(),
+            defaults={"followers": profile.follower_count},
+        )
         if account.connection_status != SocialAccount.ConnectionStatus.TOKEN_EXPIRING:
             account.connection_status = SocialAccount.ConnectionStatus.CONNECTED
         account.last_error = ""

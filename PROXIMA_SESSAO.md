@@ -295,6 +295,16 @@ apenas pela criação deste arquivo.
   sistema) e atualiza URLs dos importados (CDN expira). Busca métricas
   na importação. Miniatura do Instagram como fallback em calendário,
   modal e Top 5. Sem migração. Sem teste com conta real.
+- **Insights completo (implementado localmente):** além do resumo/Top 5,
+  tabela "Desempenho por canal" (posts, reações, comentários, taxa, com
+  variação), "Seguidores" (Barras início+ganho / Linha diária / Crescimento)
+  e "Posts" (Barras / Por formato Post-Reel-Story-Carrossel). Card de
+  seguidores mostra ganho no período. Novo modelo `FollowerSnapshot`
+  (migração `social_accounts/0005`), gravado pela verificação de saúde a
+  cada 6h (um por conta/dia): o histórico começa a acumular após o deploy.
+  Cores das séries = paleta categórica validada da skill dataviz, fixas
+  por canal. Filtro por tags não incluído (JSON `contains` não funciona no
+  SQLite dos testes; avaliar no PostgreSQL). Exportar PDF não incluído.
 - Pendentes: reformulação do Inbox,
   página Início, lembrete de publicação manual
   (stickers), correção das métricas do Facebook.

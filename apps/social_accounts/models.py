@@ -161,6 +161,25 @@ class SocialAccount(models.Model):
         return icons.get(self.platform, self.platform[:2])
 
 
+class FollowerSnapshot(models.Model):
+    """Daily follower count per account, for growth charts in Insights.
+
+    Written by the health check (one row per account per day, last value wins).
+    """
+
+    social_account = models.ForeignKey(SocialAccount, on_delete=models.CASCADE, related_name="follower_snapshots")
+    date = models.DateField()
+    followers = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = "social_follower_snapshot"
+        unique_together = [("social_account", "date")]
+        ordering = ["date"]
+
+    def __str__(self):
+        return f"{self.social_account_id} {self.date}: {self.followers}"
+
+
 class MastodonAppRegistration(models.Model):
     """Stores per-instance OAuth app registrations for Mastodon federation."""
 

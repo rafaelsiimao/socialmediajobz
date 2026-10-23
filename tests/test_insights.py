@@ -129,3 +129,69 @@ def test_brazilian_number_format():
     assert br_number(None) == "-"
     assert br_delta(-37.1) == "-37,1%"
     assert br_delta(72.7) == "+72,7%"
+
+
+@pytest.mark.django_db
+def test_channel_performance_and_posts_by_format(insights_setup):
+    workspace, account, author = insights_setup
+    reel = _published(workspace, account, author, 1, "reel", likes=10, comments=2, reach=50, interactions=12)
+    reel.platform_extra = {"post_type": "reel"}
+    reel.save(update_fields=["platform_extra"])
+    _published(workspace, account, author, 2, "feed", likes=5, comments=1, reach=50, interactions=6)
+    period = services.resolve_period(workspace, "7d")
+
+    rows = services.channel_performance(workspace, period)
+    assert rows[0]["channel"] == account
+    assert [cell["value"] for cell in rows[0]["cells"]] == [2, 15, 3, 18.0]
+
+    chart = services.posts_by_channel(workspace, period)
+    row = chart["rows"][0]
+    assert row["total"] == 2 and row["width"] == 100.0
+    assert {seg["label"]: seg["value"] for seg in row["segments"]} == {"Post": 1, "Reel": 1}
+
+
+@pytest.mark.django_db
+def test_followers_history_drives_gain_and_line(insights_setup):
+    from apps.social_accounts.models import FollowerSnapshot
+
+    workspace, account, _ = insights_setup
+    today = timezone.localdate()
+    FollowerSnapshot.objects.create(social_account=account, date=today - timedelta(days=40), followers=21000)
+    FollowerSnapshot.objects.create(social_account=account, date=today - timedelta(days=10), followers=21100)
+    period = services.resolve_period(workspace, "30d")
+
+    data = services.followers_by_channel(workspace, period)
+    row = data["rows"][0]
+    assert (row["start"], row["current"], row["gained"]) == (21000, 21200, 200)
+    assert data["has_history"] is True
+    assert [p["value"] for p in data["line"]["lines"][0]["points"]] == [21100, 21200]
+
+    followers_card = services.summary(workspace, period)[1]
+    assert followers_card["gained"] == 200
+
+
+@pytest.mark.django_db
+def test_health_check_records_daily_follower_snapshot(insights_setup):
+    from unittest.mock import MagicMock, patch
+
+    from apps.social_accounts.models import FollowerSnapshot
+    from apps.social_accounts.tasks import check_social_account_health
+
+    _, account, _ = insights_setup
+    provider = MagicMock()
+    provider.get_profile.return_value = MagicMock(follower_count=21250)
+    with patch("providers.get_provider", return_value=provider):
+        check_social_account_health.now(str(account.id))
+        check_social_account_health.now(str(account.id))
+    snapshots = FollowerSnapshot.objects.filter(social_account=account)
+    assert snapshots.count() == 1 and snapshots.get().followers == 21250
+
+
+@pytest.mark.django_db
+def test_page_renders_new_sections(client, insights_setup):
+    workspace, account, author = insights_setup
+    _published(workspace, account, author, 1, "x", likes=3, comments=1, reach=10, interactions=4)
+    body = client.get(reverse("insights:page", kwargs={"workspace_id": workspace.id})).content.decode()
+    assert "Desempenho por canal" in body
+    assert "Seguidores" in body and "Crescimento" in body
+    assert "Posts enviados no período" in body

@@ -84,6 +84,9 @@
                 <p class="text-xs text-stone-500">{{ card.label }}</p>
                 <div class="flex items-baseline gap-2 mt-1">
                     <span class="text-2xl font-semibold text-stone-900 tabular-nums">{{ card.value|br_number }}{% if card.is_percent and card.value is not None %}%{% endif %}</span>
+                    {% if card.gained is not None %}
+                    <span class="text-xs font-medium tabular-nums {% if card.gained > 0 %}text-green-700{% elif card.gained < 0 %}text-red-600{% else %}text-stone-500{% endif %}">{% if card.gained > 0 %}↗{% elif card.gained < 0 %}↘{% endif %} {{ card.gained|br_signed }}</span>
+                    {% endif %}
                     {% if card.delta is not None %}
                     <span class="text-xs font-medium tabular-nums {% if card.delta > 0 %}text-green-700{% elif card.delta < 0 %}text-red-600{% else %}text-stone-500{% endif %}">
                         {% if card.delta > 0 %}↗{% elif card.delta < 0 %}↘{% endif %} {{ card.delta|br_delta }}
@@ -152,9 +155,190 @@
         {% endif %}
     </section>
 
+    <!-- Performance per channel -->
+    <section class="rounded-2xl bg-stone-100/70 border border-stone-200 p-4">
+        <h2 class="text-base font-semibold text-stone-900">Desempenho por canal</h2>
+        <p class="text-xs text-stone-500 mt-0.5 mb-4">
+            {{ period.start_date|date:"d/m/Y" }} – {{ period.end_date|date:"d/m/Y" }} · comparado a
+            {{ period.prev_start_date|date:"d/m/Y" }} – {{ period.prev_end_date|date:"d/m/Y" }}
+        </p>
+        <div class="bg-white rounded-xl border border-stone-200 overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-stone-200 text-left text-xs text-stone-500">
+                        <th class="px-4 py-3 font-semibold">Canal</th>
+                        <th class="px-4 py-3 font-semibold">Posts</th>
+                        <th class="px-4 py-3 font-semibold">Reações</th>
+                        <th class="px-4 py-3 font-semibold">Comentários</th>
+                        <th class="px-4 py-3 font-semibold">Taxa de engajamento</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in performance %}
+                    <tr class="border-b border-stone-100 last:border-0">
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-2 whitespace-nowrap">
+                                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background: {{ row.channel.series_color }}"></span>
+                                {% include "partials/_platform_icon.html" with platform=row.channel.platform size="sm" %}
+                                <span class="font-medium text-stone-800">{{ row.channel.account_name }}</span>
+                            </div>
+                        </td>
+                        {% for cell in row.cells %}
+                        <td class="px-4 py-3 tabular-nums whitespace-nowrap">
+                            <span class="text-stone-900">{{ cell.value|br_number }}{% if cell.is_percent and cell.value is not None %}%{% endif %}</span>
+                            {% if cell.delta is not None %}
+                            <span class="ml-1 text-xs {% if cell.delta > 0 %}text-green-700{% elif cell.delta < 0 %}text-red-600{% else %}text-stone-500{% endif %}">{% if cell.delta > 0 %}↗{% elif cell.delta < 0 %}↘{% endif %} {{ cell.delta|br_delta }}</span>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="px-4 py-6 text-center text-stone-500">Nenhum canal conectado.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Followers per channel -->
+    <section class="rounded-2xl bg-stone-100/70 border border-stone-200 p-4" x-data="{ mode: 'bar' }">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+                <h2 class="text-base font-semibold text-stone-900">Seguidores</h2>
+                <p class="text-xs text-stone-500 mt-0.5">{{ period.start_date|date:"d/m/Y" }} – {{ period.end_date|date:"d/m/Y" }}</p>
+            </div>
+            <div class="inline-flex rounded-full bg-white border border-stone-200 p-0.5 text-sm font-medium">
+                <button type="button" @click="mode = 'bar'" :class="mode === 'bar' ? 'bg-stone-900 text-white' : 'text-stone-600'" class="px-3 py-1.5 rounded-full cursor-pointer">Barras</button>
+                <button type="button" @click="mode = 'line'" :class="mode === 'line' ? 'bg-stone-900 text-white' : 'text-stone-600'" class="px-3 py-1.5 rounded-full cursor-pointer">Linha</button>
+                <button type="button" @click="mode = 'growth'" :class="mode === 'growth' ? 'bg-stone-900 text-white' : 'text-stone-600'" class="px-3 py-1.5 rounded-full cursor-pointer">Crescimento</button>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-stone-200 p-4">
+            {% if not followers.has_history %}
+            <p class="text-xs text-stone-500 mb-3">O histórico de seguidores passa a ser registrado a cada verificação das contas (a cada 6 horas). A variação aparece conforme os dias forem acumulando.</p>
+            {% endif %}
+
+            <!-- Bars: at range start + gained in range -->
+            <div x-show="mode === 'bar'" class="space-y-3">
+                {% for row in followers.rows %}
+                <div class="flex items-center gap-3">
+                    <div class="w-36 flex-shrink-0 flex items-center gap-1.5 text-xs text-stone-600 truncate">
+                        {% include "partials/_platform_icon.html" with platform=row.channel.platform size="sm" %}{{ row.channel.account_name }}
+                    </div>
+                    <div class="flex-1 flex items-center h-6">
+                        <div class="h-full rounded-l {% if not row.gain_width %}rounded-r{% endif %}" style="width: {{ row.start_width }}%; background: {{ row.channel.series_color }};"
+                             title="{{ row.channel.account_name }}: {% if row.start is not None %}{{ row.start|br_number }} no início do período{% else %}{{ row.current|br_number }} seguidores{% endif %}"></div>
+                        {% if row.gain_width %}
+                        <div class="h-full rounded-r ml-0.5" style="width: {{ row.gain_width }}%; background: {{ row.channel.series_color }}; opacity: .45;"
+                             title="{{ row.channel.account_name }}: {{ row.gained|br_signed }} no período"></div>
+                        {% endif %}
+                        <span class="ml-2 text-xs text-stone-600 tabular-nums whitespace-nowrap">{{ row.current|br_number }}{% if row.gained %} <span class="text-stone-400">({{ row.gained|br_signed }})</span>{% endif %}</span>
+                    </div>
+                </div>
+                {% endfor %}
+                <div class="flex items-center gap-4 pt-2 text-xs text-stone-500">
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-stone-600"></span>No início do período</span>
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-stone-600 opacity-45"></span>Ganhos no período</span>
+                </div>
+            </div>
+
+            <!-- Line: daily followers per channel -->
+            <div x-show="mode === 'line'" x-cloak>
+                {% if followers.line %}
+                <div class="flex gap-2">
+                <div class="flex flex-col justify-between pt-1 pb-5 text-[11px] text-stone-400 tabular-nums text-right">
+                    <span>{{ followers.line.high|br_number }}</span>
+                    <span>{{ followers.line.low|br_number }}</span>
+                </div>
+                <div class="flex-1">
+                <svg viewBox="0 0 600 180" class="w-full h-auto block" role="img" aria-label="Seguidores por dia">
+                    <line x1="8" y1="8" x2="592" y2="8" stroke="#F5F5F4" stroke-width="1"/>
+                    <line x1="8" y1="172" x2="592" y2="172" stroke="#E7E5E4" stroke-width="1"/>
+                    {% for line in followers.line.lines %}
+                    <polyline points="{{ line.path }}" fill="none" stroke="{{ line.channel.series_color }}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                    {% for point in line.points %}
+                    <circle cx="{{ point.x }}" cy="{{ point.y }}" r="4" fill="{{ line.channel.series_color }}" stroke="#fff" stroke-width="2">
+                        <title>{{ line.channel.account_name }} · {{ point.date|date:"d/m" }}: {{ point.value|br_number }}</title>
+                    </circle>
+                    {% endfor %}
+                    {% endfor %}
+                </svg>
+                <div class="flex justify-between text-[11px] text-stone-400 tabular-nums">
+                    <span>{{ followers.line.start|date:"d/m" }}</span><span>{{ followers.line.end|date:"d/m" }}</span>
+                </div>
+                </div>
+                </div>
+                <div class="flex flex-wrap gap-4 pt-2 text-xs text-stone-600">
+                    {% for line in followers.line.lines %}
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 rounded" style="background: {{ line.channel.series_color }}"></span>{{ line.channel.account_name }}</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-stone-500 py-6 text-center">Ainda não há histórico de seguidores neste período.</p>
+                {% endif %}
+            </div>
+
+            <!-- Growth: gained in range per channel -->
+            <div x-show="mode === 'growth'" x-cloak class="space-y-2">
+                {% for row in followers.rows %}
+                <div class="flex items-center justify-between gap-3 text-sm">
+                    <span class="flex items-center gap-1.5 text-stone-700">
+                        <span class="w-2.5 h-2.5 rounded-full" style="background: {{ row.channel.series_color }}"></span>{{ row.channel.account_name }}
+                    </span>
+                    <span class="tabular-nums {% if row.gained > 0 %}text-green-700{% elif row.gained < 0 %}text-red-600{% else %}text-stone-500{% endif %}">
+                        {% if row.gained is not None %}{{ row.gained|br_signed }} seguidores{% else %}sem histórico{% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Posts per channel -->
+    <section class="rounded-2xl bg-stone-100/70 border border-stone-200 p-4" x-data="{ mode: 'bar' }">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+                <h2 class="text-base font-semibold text-stone-900">Posts</h2>
+                <p class="text-xs text-stone-500 mt-0.5">{{ period.start_date|date:"d/m/Y" }} – {{ period.end_date|date:"d/m/Y" }}</p>
+            </div>
+            <div class="inline-flex rounded-full bg-white border border-stone-200 p-0.5 text-sm font-medium">
+                <button type="button" @click="mode = 'bar'" :class="mode === 'bar' ? 'bg-stone-900 text-white' : 'text-stone-600'" class="px-3 py-1.5 rounded-full cursor-pointer">Barras</button>
+                <button type="button" @click="mode = 'stack'" :class="mode === 'stack' ? 'bg-stone-900 text-white' : 'text-stone-600'" class="px-3 py-1.5 rounded-full cursor-pointer">Por formato</button>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-stone-200 p-4 space-y-3">
+            {% for row in posts_chart.rows %}
+            <div class="flex items-center gap-3">
+                <div class="w-36 flex-shrink-0 flex items-center gap-1.5 text-xs text-stone-600 truncate">
+                    {% include "partials/_platform_icon.html" with platform=row.channel.platform size="sm" %}{{ row.channel.account_name }}
+                </div>
+                <div class="flex-1 flex items-center h-6">
+                    {% if row.total %}
+                    <div x-show="mode === 'bar'" class="h-full rounded" style="width: {{ row.width }}%; background: {{ row.channel.series_color }};"
+                         title="{{ row.channel.account_name }}: {{ row.total }} posts"></div>
+                    <div x-show="mode === 'stack'" x-cloak class="h-full flex gap-0.5" style="width: {{ row.width }}%;">
+                        {% for seg in row.segments %}
+                        <div class="h-full first:rounded-l last:rounded-r" style="flex: {{ seg.value }} 0 0; background: {{ seg.color }};"
+                             title="{{ row.channel.account_name }} · {{ seg.label }}: {{ seg.value }}"></div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <span class="ml-2 text-xs text-stone-600 tabular-nums">{{ row.total }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            <div x-show="mode === 'stack'" x-cloak class="flex flex-wrap items-center gap-4 pt-2 text-xs text-stone-500">
+                {% for label, color in posts_chart.formats %}
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background: {{ color }}"></span>{{ label }}</span>
+                {% endfor %}
+            </div>
+            <p class="text-xs text-stone-400 text-center">Posts enviados no período</p>
+        </div>
+    </section>
+
     <p class="text-xs text-stone-400">
         Métricas disponíveis apenas para o Instagram (posts publicados pelo sistema e posts importados). Stories têm métricas só nas
-        primeiras 24h. A variação de seguidores ainda não é registrada.
+        primeiras 24h. A variação de seguidores é registrada a partir da ativação desta versão.
     </p>
 </div>
 

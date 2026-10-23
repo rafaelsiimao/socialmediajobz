@@ -20,3 +20,12 @@ def br_delta(value):
         return ""
     sign = "+" if value > 0 else ""
     return f"{sign}{br_number(float(value))}%"
+
+
+@register.filter
+def br_signed(value):
+    """Signed integer with Brazilian separators, e.g. +112 / -8."""
+    if value is None:
+        return ""
+    sign = "+" if value > 0 else ""
+    return f"{sign}{br_number(value)}"

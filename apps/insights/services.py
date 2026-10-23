@@ -119,10 +119,12 @@ def summary(workspace, period, account_id=None):
     if account_id:
         accounts = accounts.filter(id=account_id)
     followers = accounts.aggregate(total=Sum("follower_count"))["total"] or 0
+    gains = [row["gained"] for row in followers_by_channel(workspace, period, account_id)["rows"] if row["gained"] is not None]
+    followers_gained = sum(gains) if gains else None
 
     cards = [
         ("Posts", current["posts"], _delta(current["posts"], previous["posts"]), "Publicações do período (feitas pelo sistema ou importadas do Instagram)."),
-        ("Seguidores", followers, None, "Total atual das contas conectadas (sem histórico de variação ainda)."),
+        ("Seguidores", followers, None, "Total atual das contas conectadas; a variação mostra os seguidores ganhos no período."),
         ("Reações", current["likes"], _delta(current["likes"], previous["likes"]), "Curtidas (Instagram) dos posts do período."),
         ("Comentários", current["comments"], _delta(current["comments"], previous["comments"]), "Comentários nos posts do período."),
         (
@@ -133,10 +135,12 @@ def summary(workspace, period, account_id=None):
         ),
         ("Visualizações", current["views"], _delta(current["views"], previous["views"]), "Visualizações dos posts do período (Instagram)."),
     ]
-    return [
+    result = [
         {"label": label, "value": value, "delta": delta, "help": help_text, "is_percent": label == "Taxa de engajamento"}
         for label, value, delta, help_text in cards
     ]
+    result[1]["gained"] = followers_gained
+    return result
 
 
 def top_posts(workspace, period, order="likes", account_id=None, limit=5):
@@ -183,3 +187,126 @@ def takeaways(workspace, account_id=None):
             }
         )
     return cards
+
+
+# Categorical slots from the dataviz reference palette (validated, fixed order).
+SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
+FORMATS = [("post", "Post"), ("reel", "Reel"), ("story", "Story"), ("carousel", "Carrossel")]
+
+
+def channels_for(workspace, account_id=None):
+    """Connected channels in a stable order; each keeps its color whatever the filter."""
+    channels = list(
+        SocialAccount.objects.filter(
+            workspace=workspace, connection_status=SocialAccount.ConnectionStatus.CONNECTED
+        ).order_by("platform", "account_name", "id")
+    )
+    for index, channel in enumerate(channels):
+        channel.series_color = SERIES_COLORS[index % len(SERIES_COLORS)]
+    if account_id:
+        channels = [c for c in channels if str(c.id) == str(account_id)]
+    return channels
+
+
+def channel_performance(workspace, period, account_id=None):
+    rows = []
+    for channel in channels_for(workspace, account_id):
+        current = _totals(published_posts(workspace, period.start, period.end, channel.id))
+        previous = _totals(published_posts(workspace, period.prev_start, period.prev_end, channel.id))
+        rows.append(
+            {
+                "channel": channel,
+                "cells": [
+                    {"value": current[key], "delta": _delta(current[key], previous[key]), "is_percent": key == "engagement_rate"}
+                    for key in ("posts", "likes", "comments", "engagement_rate")
+                ],
+            }
+        )
+    return rows
+
+
+def _format_of(platform_post):
+    post_type = (platform_post.platform_extra or {}).get("post_type")
+    return post_type if post_type in ("reel", "story", "carousel") else "post"
+
+
+def posts_by_channel(workspace, period, account_id=None):
+    """Posts sent per channel, split by format, with bar widths relative to the max."""
+    rows = []
+    for channel in channels_for(workspace, account_id):
+        counts = {key: 0 for key, _ in FORMATS}
+        for platform_post in published_posts(workspace, period.start, period.end, channel.id).only("platform_extra"):
+            counts[_format_of(platform_post)] += 1
+        rows.append({"channel": channel, "total": sum(counts.values()), "counts": counts})
+    top = max((row["total"] for row in rows), default=0) or 1
+    for row in rows:
+        row["width"] = round(row["total"] / top * 100, 1)
+        row["segments"] = [
+            {
+                "label": label,
+                "value": row["counts"][key],
+                "width": round(row["counts"][key] / top * 100, 1),
+                "color": SERIES_COLORS[index],
+            }
+            for index, (key, label) in enumerate(FORMATS)
+            if row["counts"][key]
+        ]
+    return {"rows": rows, "max": top, "formats": [(label, SERIES_COLORS[i]) for i, (_, label) in enumerate(FORMATS)]}
+
+
+def followers_by_channel(workspace, period, account_id=None):
+    """Followers at range start, gained in range and a daily series per channel.
+
+    Uses FollowerSnapshot (recorded by the health check); today's point is the
+    live ``follower_count``. Channels without history only show the current value.
+    """
+    from apps.social_accounts.models import FollowerSnapshot
+
+    start_date, end_date = period.start_date, period.end_date
+    today = timezone.localdate()
+    rows = []
+    for channel in channels_for(workspace, account_id):
+        snapshots = FollowerSnapshot.objects.filter(social_account=channel)
+        baseline = snapshots.filter(date__lte=start_date).order_by("-date").first()
+        if baseline is None:
+            baseline = snapshots.filter(date__gte=start_date, date__lte=end_date).order_by("date").first()
+        series = {s.date: s.followers for s in snapshots.filter(date__gte=start_date, date__lte=end_date)}
+        if start_date <= today <= end_date:
+            series[today] = channel.follower_count
+        current = series[max(series)] if series else channel.follower_count
+        start_value = baseline.followers if baseline else None
+        rows.append(
+            {
+                "channel": channel,
+                "start": start_value,
+                "current": current,
+                "gained": current - start_value if start_value is not None else None,
+                "series": sorted(series.items()),
+            }
+        )
+    top = max((max(row["current"], row["start"] or 0) for row in rows), default=0) or 1
+    for row in rows:
+        base = row["start"] if row["start"] is not None else row["current"]
+        row["start_width"] = round(min(base, row["current"]) / top * 100, 1)
+        row["gain_width"] = round(max(row["gained"] or 0, 0) / top * 100, 1)
+    return {"rows": rows, "max": top, "line": _line_chart(rows, start_date, end_date), "has_history": any(r["start"] is not None for r in rows)}
+
+
+def _line_chart(rows, start_date, end_date, width=600, height=180, pad=8):
+    """SVG polyline points per channel (shared y scale, one axis)."""
+    values = [v for row in rows for _, v in row["series"]]
+    if not values:
+        return {}
+    low, high = min(values), max(values)
+    span_days = max((end_date - start_date).days, 1)
+    span_values = (high - low) or 1
+    lines = []
+    for row in rows:
+        points = []
+        for day, value in row["series"]:
+            x = pad + (day - start_date).days / span_days * (width - 2 * pad)
+            y = height - pad - (value - low) / span_values * (height - 2 * pad)
+            points.append({"x": round(x, 1), "y": round(y, 1), "date": day, "value": value})
+        if points:
+            lines.append({"channel": row["channel"], "points": points, "path": " ".join(f"{p['x']},{p['y']}" for p in points)})
+    return {"lines": lines, "low": low, "high": high, "start": start_date, "end": end_date}
