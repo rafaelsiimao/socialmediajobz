@@ -121,11 +121,78 @@ def test_story_payload_has_no_caption_and_detects_signed_video(url, media_key):
     assert "caption" not in payload
 
 
-def test_story_requires_exactly_one_media():
+def test_story_sequence_limits():
     provider = InstagramProvider({"ig_user_id": "123"})
-    content = PublishContent(
-        post_type=PostType.STORY, media_urls=["https://example.com/a.jpg", "https://example.com/b.jpg"]
-    )
-    with patch.object(provider, "_create_container") as create, pytest.raises(PublishError):
-        provider.publish_post("token", content)
-    create.assert_not_called()
+    for urls in ([], [f"https://example.com/{i}.jpg" for i in range(11)]):
+        content = PublishContent(post_type=PostType.STORY, media_urls=urls)
+        with patch.object(provider, "_create_container") as create, pytest.raises(PublishError):
+            provider.publish_post("token", content)
+        create.assert_not_called()
+
+
+def test_story_sequence_prepares_all_media_before_publishing_in_order():
+    provider = InstagramProvider({"ig_user_id": "123"})
+    urls = ["https://example.com/1.jpg", "https://example.com/2.mp4", "https://example.com/3.jpg"]
+    events = []
+
+    def create(token, ig_user_id, payload):
+        events.append(("create", payload))
+        return f"c{len(events)}"
+
+    def publish(token, ig_user_id, container_id):
+        events.append(("publish", container_id))
+        return PublishResult(f"media-{container_id}", url=f"https://instagram.com/{container_id}")
+
+    with (
+        patch.object(provider, "_create_container", side_effect=create),
+        patch.object(provider, "_wait_for_container"),
+        patch.object(provider, "_publish_container", side_effect=publish),
+    ):
+        result = provider.publish_post("token", PublishContent(post_type=PostType.STORY, media_urls=urls))
+
+    kinds = [kind for kind, _ in events]
+    assert kinds == ["create", "create", "create", "publish", "publish", "publish"]
+    assert "video_url" in events[1][1] and "image_url" in events[0][1]
+    assert [arg for kind, arg in events if kind == "publish"] == ["c1", "c2", "c3"]
+    assert result.platform_post_id == "media-c1"
+    assert result.extra["story_ids"] == ["media-c1", "media-c2", "media-c3"]
+
+
+def test_story_sequence_failure_before_publishing_raises_for_safe_retry():
+    provider = InstagramProvider({"ig_user_id": "123"})
+    urls = ["https://example.com/1.jpg", "https://example.com/2.jpg"]
+    with (
+        patch.object(provider, "_create_container", side_effect=["c1", PublishError("bad media")]),
+        patch.object(provider, "_wait_for_container"),
+        patch.object(provider, "_publish_container") as publish,
+        pytest.raises(PublishError),
+    ):
+        provider.publish_post("token", PublishContent(post_type=PostType.STORY, media_urls=urls))
+    publish.assert_not_called()
+
+
+def test_story_sequence_partial_publish_is_reported_without_retry():
+    provider = InstagramProvider({"ig_user_id": "123"})
+    urls = ["https://example.com/1.jpg", "https://example.com/2.jpg"]
+    with (
+        patch.object(provider, "_create_container", side_effect=["c1", "c2"]),
+        patch.object(provider, "_wait_for_container"),
+        patch.object(
+            provider, "_publish_container", side_effect=[PublishResult("m1"), PublishError("limite atingido")]
+        ),
+    ):
+        result = provider.publish_post("token", PublishContent(post_type=PostType.STORY, media_urls=urls))
+    assert result.platform_post_id == "m1"
+    assert result.extra["story_ids"] == ["m1"]
+    assert "1 de 2 Stories" in result.extra["story_errors"]
+
+
+@pytest.mark.django_db
+def test_preview_renders_story_layout_when_selected(client, instagram_editor):
+    workspace, account = instagram_editor
+    url = reverse("composer:preview", kwargs={"workspace_id": workspace.id})
+    story = client.get(url, {"selected_accounts": str(account.id), f"ig_format_{account.id}": "story"})
+    feed = client.get(url, {"selected_accounts": str(account.id), f"ig_format_{account.id}": "feed"})
+    assert "aspect-ratio: 9/16" in story.content.decode()
+    assert "Enviar mensagem" in story.content.decode()
+    assert "aspect-ratio: 9/16" not in feed.content.decode()

@@ -176,6 +176,15 @@ apenas pela criação deste arquivo.
   ignorando query string de URL assinada (vale também para carrossel).
   Primeiro comentário não é enviado em Story. Sem publicação real testada.
   "Compartilhar post do feed nos Stories" (cartão nativo) continua fora.
+  Commit `d43c557`.
+- **Prévia de Story e sequência (implementado localmente):** com Story
+  selecionado, a prévia do Composer vira um Story 9:16 (barras de
+  progresso por mídia, toque nas laterais para navegar). Sequência: cada
+  mídia vira um Story, publicados em ordem (1 a 10). O provider cria e
+  processa todos os contêineres antes de publicar (falha de mídia = nada
+  publicado, retry seguro); se falhar no meio da publicação, marca como
+  publicado com `story_ids` e `story_errors` para não duplicar no retry.
+  Métricas usam só o primeiro Story da sequência.
 - Pendentes: importação do histórico do Instagram, reformulação do Inbox,
   correção das métricas do Facebook.
 

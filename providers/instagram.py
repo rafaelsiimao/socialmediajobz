@@ -13,7 +13,7 @@ from datetime import datetime
 from urllib.parse import urlencode, urlsplit
 
 from .base import SocialProvider
-from .exceptions import APIError, OAuthError, PublishError
+from .exceptions import APIError, OAuthError, ProviderError, PublishError
 from .types import (
     AccountMetrics,
     AccountProfile,
@@ -33,6 +33,9 @@ from .types import (
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://graph.facebook.com/v21.0"
+# Each Story in a sequence is a separate publish and counts toward the
+# account's 24h publishing limit.
+MAX_STORY_SEQUENCE = 10
 OAUTH_URL = "https://www.facebook.com/v21.0/dialog/oauth"
 TOKEN_URL = f"{BASE_URL}/oauth/access_token"
 
@@ -236,10 +239,15 @@ class InstagramProvider(SocialProvider):
             raise PublishError(
                 "Colaboração está disponível apenas para fotos, carrosséis e Reels.", platform=self.platform_name
             )
-        if content.post_type == PostType.STORY and len(content.media_urls) != 1:
-            raise PublishError("Story aceita exatamente 1 imagem ou 1 vídeo.", platform=self.platform_name)
+        if content.post_type == PostType.STORY and not 1 <= len(content.media_urls) <= MAX_STORY_SEQUENCE:
+            raise PublishError(
+                f"Story aceita de 1 a {MAX_STORY_SEQUENCE} imagens ou vídeos (um Story por mídia).",
+                platform=self.platform_name,
+            )
         ig_user_id = content.extra.get("ig_user_id") or self._get_ig_user_id(access_token)
 
+        if content.post_type == PostType.STORY:
+            return self._publish_story_sequence(access_token, ig_user_id, content)
         if content.post_type == PostType.CAROUSEL:
             return self._publish_carousel(access_token, ig_user_id, content, collaborators=collaborators)
         return self._publish_single(access_token, ig_user_id, content, collaborators=collaborators)
@@ -247,11 +255,10 @@ class InstagramProvider(SocialProvider):
     def _publish_single(
         self, access_token: str, ig_user_id: str, content: PublishContent, *, collaborators=None
     ) -> PublishResult:
-        """Publish a single image, reel, or story."""
+        """Publish a single image or reel."""
         payload: dict = {}
 
-        # Stories have no caption field in the Graph API.
-        if content.text and content.post_type != PostType.STORY:
+        if content.text:
             payload["caption"] = content.text
         if collaborators:
             payload["collaborators"] = collaborators
@@ -259,13 +266,6 @@ class InstagramProvider(SocialProvider):
         if content.post_type == PostType.REEL:
             payload["media_type"] = "REELS"
             payload["video_url"] = content.media_urls[0]
-        elif content.post_type == PostType.STORY:
-            if _is_video_url(content.media_urls[0]):
-                payload["media_type"] = "STORIES"
-                payload["video_url"] = content.media_urls[0]
-            else:
-                payload["media_type"] = "STORIES"
-                payload["image_url"] = content.media_urls[0]
         else:
             # Default IMAGE
             payload["image_url"] = content.media_urls[0]
@@ -278,6 +278,42 @@ class InstagramProvider(SocialProvider):
 
         # Step 3: publish
         return self._publish_container(access_token, ig_user_id, container_id)
+
+    def _publish_story_sequence(self, access_token: str, ig_user_id: str, content: PublishContent) -> PublishResult:
+        """Publish each media as its own Story, in order.
+
+        All containers are created and processed before anything is published,
+        so a media failure leaves nothing live and the engine can retry safely.
+        Stories have no caption field in the Graph API, so the text is ignored.
+        """
+        container_ids = []
+        for url in content.media_urls:
+            media_key = "video_url" if _is_video_url(url) else "image_url"
+            container_id = self._create_container(access_token, ig_user_id, {"media_type": "STORIES", media_key: url})
+            self._wait_for_container(access_token, container_id)
+            container_ids.append(container_id)
+
+        published: list[PublishResult] = []
+        for container_id in container_ids:
+            try:
+                published.append(self._publish_container(access_token, ig_user_id, container_id))
+            except ProviderError as exc:
+                if not published:
+                    raise
+                # Some Stories are already live: report success so a retry does
+                # not publish them twice, and keep the error for the team.
+                logger.warning("Story sequence stopped after %d of %d: %s", len(published), len(container_ids), exc)
+                return self._story_sequence_result(
+                    published, error=f"{len(published)} de {len(container_ids)} Stories publicados: {exc}"
+                )
+        return self._story_sequence_result(published)
+
+    @staticmethod
+    def _story_sequence_result(published: list[PublishResult], error: str = "") -> PublishResult:
+        extra: dict = {"story_ids": [result.platform_post_id for result in published]}
+        if error:
+            extra["story_errors"] = error
+        return PublishResult(platform_post_id=published[0].platform_post_id, url=published[0].url, extra=extra)
 
     def _publish_carousel(
         self, access_token: str, ig_user_id: str, content: PublishContent, *, collaborators=None

@@ -1036,6 +1036,8 @@ def preview(request, workspace_id):
                     if len(effective_caption) > char_limit
                     else effective_caption,
                     "needs_title": field_config["needs_title"],
+                    "is_story": account.platform == "instagram"
+                    and request.GET.get(f"ig_format_{account.id}") == "story",
                 }
             )
 

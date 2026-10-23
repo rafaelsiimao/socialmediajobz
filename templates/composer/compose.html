@@ -703,18 +703,20 @@
                         <div class="inline-flex rounded-full bg-stone-100 p-0.5">
                             <label class="px-3 py-1.5 text-xs font-semibold rounded-full cursor-pointer transition-colors"
                                    :class="igFormat === 'feed' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'">
-                                <input type="radio" class="sr-only" name="ig_format_{{ account.id }}" value="feed" x-model="igFormat">
+                                <input type="radio" class="sr-only" name="ig_format_{{ account.id }}" value="feed" x-model="igFormat"
+                                       @change="document.body.dispatchEvent(new CustomEvent('previewUpdate'))">
                                 Feed
                             </label>
                             <label class="px-3 py-1.5 text-xs font-semibold rounded-full cursor-pointer transition-colors"
                                    :class="igFormat === 'story' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'">
-                                <input type="radio" class="sr-only" name="ig_format_{{ account.id }}" value="story" x-model="igFormat">
+                                <input type="radio" class="sr-only" name="ig_format_{{ account.id }}" value="story" x-model="igFormat"
+                                       @change="document.body.dispatchEvent(new CustomEvent('previewUpdate'))">
                                 Story
                             </label>
                         </div>
                         <p x-show="igFormat === 'story'" x-cloak class="text-xs text-stone-500 mt-2">
-                            Story usa 1 imagem ou 1 vídeo (até 60 s), de preferência na vertical 9:16.
-                            A legenda não aparece no Story.
+                            Cada imagem ou vídeo (até 60 s) vira um Story, publicados em sequência na
+                            ordem das mídias (até 10). Prefira formato vertical 9:16. A legenda não aparece no Story.
                         </p>
                     </fieldset>
                     <div x-show="igFormat === 'feed'">
