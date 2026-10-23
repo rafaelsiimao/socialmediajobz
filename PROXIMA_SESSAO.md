@@ -154,7 +154,22 @@ apenas pela criação deste arquivo.
   RECONECTAR a conta Instagram após o deploy. DMs também exigem ativar no
   app do Instagram "Ferramentas conectadas / Permitir acesso às mensagens"
   e, segundo a doc da Meta, empresa verificada. Sem teste com conta real.
-- Pendentes: Stories, importação do histórico do Instagram.
+- Inbox: bug das mensagens exibidas como avisos azuis no topo corrigido
+  (`89a20ea`, contexto usava a chave `messages` do Django).
+- **Futuro: reformular o Inbox no estilo "Community" do Buffer** (Rafael
+  enviou captura de referência; adiado a pedido dele). Escopo combinado:
+  abas Comentários / Mensagens com contagem; coluna esquerda com posts
+  (conta, início da legenda, miniatura, nº de comentários, barra
+  respondidos/total); painel direito com cabeçalho do post, "X respondidos /
+  Y comentários" e comentários em sequência, cada um com caixa de resposta
+  inline já com `@usuario`, sugestões rápidas ("Obrigado, @x! 🙌", "Valeu
+  demais! 😊") e botão de resolver. DMs agrupadas por conversa. Tudo em
+  português. Por trás: sync deve guardar `media_url`/`thumbnail_url`/
+  `timestamp` da mídia no `extra` (hoje guarda `media_id`, `permalink`,
+  `media_caption`). "Respondido" = tem `InboxReply` ou status resolvido.
+  Fora do escopo inicial: Menções (webhooks) e comentários do Facebook.
+- Pendentes: Stories, importação do histórico do Instagram, reformulação
+  do Inbox, correção das métricas do Facebook.
 
 ## Novas funcionalidades planejadas (ordem combinada)
 
