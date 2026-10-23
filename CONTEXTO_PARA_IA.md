@@ -1,6 +1,13 @@
 # Jobz Social Media — contexto e passagem de trabalho
 
-Atualizado em 22/10/2026, com base no código local e nas confirmações do usuário.
+Atualizado em 23/10/2026, com base no código local e nas confirmações do usuário.
+
+**RETOMADA ATUAL:** leia primeiro `PROXIMA_SESSAO.md`. Estamos na preparação da
+análise do app Meta para contas de clientes, tela “Enviar para a análise do app”,
+seção Verificação, botão “Ir para a verificação”. App já publicado, mas análise
+ainda não enviada. Esse arquivo registra capturas, permissões e esclarecimentos
+posteriores ao histórico abaixo. Foi criado localmente a pedido de Rafael para
+passagem de sessão; sua criação não pressupõe commit, push ou implantação.
 
 ## Atualização posterior — consultar antes do histórico
 

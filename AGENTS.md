@@ -1,6 +1,7 @@
 # Instruções para agentes
 
-Antes de trabalhar, leia `CONTEXTO_PARA_IA.md`. Ele registra arquitetura,
+Antes de trabalhar, leia `PROXIMA_SESSAO.md` (ponto atual da análise Meta em
+23/10/2026) e depois `CONTEXTO_PARA_IA.md`. Ele registra arquitetura,
 correções, implantação e o ponto em que a conversa parou. Consulte também
 `README.md`, `LOCAL.md` e os arquivos reais antes de assumir comportamentos.
 
@@ -27,9 +28,10 @@ correções, implantação e o ponto em que a conversa parou. Consulte também
 
 ## Estado da tarefa
 
-O seletor de aprovador já foi implementado em alterações posteriores à criação
-deste guia. O trabalho atual adiciona colaboradores do Instagram por publicação,
-com até três nomes por conta e persistência em `PlatformPost.platform_extra`.
+O trabalho atual é orientar a análise do app Meta para conectar contas de
+clientes, com outro perfil Facebook, em novos workspaces. A solicitação ainda
+não foi enviada; tela atual e próximos passos estão em `PROXIMA_SESSAO.md`.
+Colaboração Instagram, seletor de aprovador e correção de prévia já existem.
 Música e compartilhamento nos Stories foram discutidos, mas não implementados.
 Consulte a atualização no início do documento de contexto antes do histórico.
 

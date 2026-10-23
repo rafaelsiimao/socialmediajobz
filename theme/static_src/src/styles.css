@@ -78,7 +78,7 @@
 
   /* Surfaces */
   --surface-0: #FFFFFF;
-  --surface-page: rgb(247, 246, 242);
+  --surface-page: #F1F4F7;
   --surface-1: var(--neutral-50);
   --surface-2: var(--neutral-100);
   --surface-3: var(--neutral-200);
