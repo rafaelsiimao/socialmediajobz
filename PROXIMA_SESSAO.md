@@ -274,8 +274,18 @@ apenas pela criação deste arquivo.
   Correção: vídeo único no Instagram como "Post" ia como imagem e falhava;
   agora vira Reel automaticamente (engine `_resolve_post_type`).
   Stickers ficam fora (API não suporta; ver item do Composer acima).
+- **Página Insights (implementada localmente):** app `apps/insights`
+  (sem modelos/migração), rota `/workspace/<id>/insights/`, item no menu.
+  Período 7d/30d/mês/personalizado + filtro de canal; resumo vs período
+  anterior (posts, seguidores atuais, reações, comentários, taxa de
+  engajamento = interações ÷ alcance, visualizações); Top 5 por reações ou
+  comentários abrindo o modal de prévia (extraído para
+  `calendar/partials/_post_detail_modal.html`); destaques (comentários
+  sem resposta, sem posts em 7 dias); exportar CSV (`;`, BOM para Excel).
+  Números no formato brasileiro (`insights_tags`). Testes em
+  `tests/test_insights.py`; conferido no navegador.
 - Pendentes: importação do histórico do Instagram, reformulação do Inbox,
-  página Início, página Insights, lembrete de publicação manual
+  página Início, lembrete de publicação manual
   (stickers), correção das métricas do Facebook.
 
 ## Novas funcionalidades planejadas (ordem combinada)
