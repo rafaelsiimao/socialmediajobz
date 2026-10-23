@@ -12,6 +12,7 @@ Shows all published/partially_published platform posts. Loaded via HTMX into #ta
                 <th class="px-4 py-3 text-xs font-semibold text-stone-400 uppercase tracking-wider">Status</th>
                 <th class="px-4 py-3 text-xs font-semibold text-stone-400 uppercase tracking-wider">Publicado</th>
                 <th class="px-4 py-3 text-xs font-semibold text-stone-400 uppercase tracking-wider">Legenda</th>
+                <th class="px-4 py-3 text-xs font-semibold text-stone-400 uppercase tracking-wider">Desempenho</th>
                 <th class="px-4 py-3 text-xs font-semibold text-stone-400 uppercase tracking-wider">Canal</th>
                 <th class="px-4 py-3 text-xs font-semibold text-stone-400 uppercase tracking-wider">Autor</th>
             </tr>
@@ -67,6 +68,23 @@ Shows all published/partially_published platform posts. Loaded via HTMX into #ta
                 </td>
                 <td class="px-4 py-3 text-sm text-stone-600 max-w-xs truncate">
                     {{ pp.post.title|default:pp.post.caption_snippet|default:"(sem legenda)" }}
+                </td>
+                <td class="px-4 py-3 text-xs text-stone-500 tabular-nums">
+                    {% if pp.metrics.fetched_at %}
+                    <div class="flex flex-wrap gap-x-3 gap-y-0.5">
+                        {% if pp.metrics.views %}<span title="Visualizações">👁 {{ pp.metrics.views }}</span>{% endif %}
+                        {% if pp.metrics.reach %}<span title="Alcance">◎ {{ pp.metrics.reach }}</span>{% endif %}
+                        <span title="Curtidas">♥ {{ pp.metrics.likes }}</span>
+                        <span title="Comentários">💬 {{ pp.metrics.comments }}</span>
+                        {% if pp.metrics.shares %}<span title="Compartilhamentos">↗ {{ pp.metrics.shares }}</span>{% endif %}
+                        {% if pp.metrics.saves %}<span title="Salvamentos">🔖 {{ pp.metrics.saves }}</span>{% endif %}
+                    </div>
+                    <span class="text-[10px] text-stone-400">Atualizado {{ pp.metrics.fetched_at|timesince }} atrás</span>
+                    {% elif pp.status == "published" %}
+                    <span class="text-stone-300" title="{{ pp.metrics.last_error|default:'Aguardando a próxima atualização' }}">Aguardando métricas</span>
+                    {% else %}
+                    <span class="text-stone-300">-</span>
+                    {% endif %}
                 </td>
                 <td class="px-4 py-3">
                     <div class="flex items-center gap-1.5">

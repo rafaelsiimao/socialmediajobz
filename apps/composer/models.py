@@ -528,6 +528,49 @@ class PlatformPost(models.Model):
 Post.Status = PlatformPost.Status  # type: ignore[attr-defined]
 
 
+class PlatformPostMetrics(models.Model):
+    """Latest performance snapshot fetched from the platform for a published PlatformPost."""
+
+    platform_post = models.OneToOneField(
+        PlatformPost,
+        on_delete=models.CASCADE,
+        related_name="metrics",
+    )
+    views = models.PositiveIntegerField(default=0)
+    reach = models.PositiveIntegerField(default=0)
+    likes = models.PositiveIntegerField(default=0)
+    comments = models.PositiveIntegerField(default=0)
+    shares = models.PositiveIntegerField(default=0)
+    saves = models.PositiveIntegerField(default=0)
+    interactions = models.PositiveIntegerField(default=0)
+    raw = models.JSONField(default=dict, blank=True)
+    fetched_at = models.DateTimeField(blank=True, null=True)
+    last_error = models.TextField(blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "composer_platform_post_metrics"
+
+    def __str__(self):
+        return f"PlatformPostMetrics({self.platform_post_id})"
+
+    @property
+    def summary(self):
+        """Short human-readable summary used in calendar tooltips."""
+        parts = []
+        if self.views:
+            parts.append(f"{self.views} visualizações")
+        if self.reach:
+            parts.append(f"{self.reach} alcance")
+        parts.append(f"{self.likes} curtidas")
+        parts.append(f"{self.comments} comentários")
+        if self.shares:
+            parts.append(f"{self.shares} compartilhamentos")
+        if self.saves:
+            parts.append(f"{self.saves} salvamentos")
+        return " · ".join(parts)
+
+
 class PostMedia(models.Model):
     """Media attachment on a post, with ordering and alt text."""
 

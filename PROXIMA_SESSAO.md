@@ -107,7 +107,24 @@ apenas pela criação deste arquivo.
   aprovada. Community Management API ainda em "Access Form Review"
   (1 de 2); pode haver pedido de documentos por e-mail em 10 a 14 dias úteis.
 
-## Novas funcionalidades planejadas (ordem combinada, nada além da cor feito)
+## Andamento das funcionalidades
+
+- Cor: feita, commit `64d40f1`, implantada por Rafael.
+- Publicados no calendário: já existia no código (selo verde), nada alterado.
+- Analytics dos posts publicados pelo sistema: implementado localmente
+  (Instagram e Facebook). Modelo `PlatformPostMetrics` (migração composer
+  0017), serviço `apps/composer/metrics.py`, tarefa recorrente a cada 3h
+  (`refresh_post_metrics`, registrada no post_migrate), últimos 90 dias.
+  Coluna "Desempenho" na aba Enviados e tooltip nos chips do calendário.
+  Providers atualizados: Instagram usa `reach, views, likes, comments,
+  shares, saved, total_interactions` (impressions/engagement foram
+  descontinuadas) com fallback para `like_count/comments_count`; Facebook
+  lê só reações/comentários/compartilhamentos do post (insights exigem
+  `read_insights`, que o app não pede). 166 testes passaram, lint ok.
+  Sem teste com token real. Exige deploy de web E worker (migração).
+- Pendentes: Stories, importação do histórico do Instagram.
+
+## Novas funcionalidades planejadas (ordem combinada)
 
 1. Trocar cor `#F7F6F2` por `#F1F4F7`: `--surface-page` em
    `theme/static_src/src/styles.css`. Exige build Tailwind e deploy do web.

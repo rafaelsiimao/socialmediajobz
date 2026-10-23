@@ -11,6 +11,12 @@ passagem de sessão; sua criação não pressupõe commit, push ou implantação
 
 ## Atualização posterior — consultar antes do histórico
 
+Analytics de publicações (23/10/2026): ver `PROXIMA_SESSAO.md`, seção
+"Andamento das funcionalidades". Modelo novo `PlatformPostMetrics`
+(migração `composer/0017`), métricas Meta atualizadas nos providers.
+Testes locais usam `--ds=config.settings.development` (o settings de teste
+tenta PostgreSQL em localhost e falha por timeout).
+
 LinkedIn Personal (22/10/2026): captura do app "Social Jobz" mostra scopes
 `openid`, `profile`, `w_member_social`, `email`, mas callbacks cadastrados
 incorretamente com `/social-accounts/oauth/callback/`. Os caminhos reais são

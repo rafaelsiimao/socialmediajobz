@@ -146,7 +146,7 @@ def _get_filtered_platform_posts(workspace, request):
 
     qs = (
         PlatformPost.objects.filter(post__workspace_id=workspace.id)
-        .select_related("post", "post__author", "post__category", "social_account")
+        .select_related("post", "post__author", "post__category", "social_account", "metrics")
         .annotate(effective_at=Coalesce("scheduled_at", "post__scheduled_at"))
     )
 
@@ -756,7 +756,7 @@ def publish_tab_sent(request, workspace_id):
             post__workspace_id=workspace.id,
             status__in=["published", "failed"],
         )
-        .select_related("post__author", "social_account")
+        .select_related("post__author", "social_account", "metrics")
         .prefetch_related("post__media_attachments__media_asset")
         .order_by("-post__scheduled_at", "-post__created_at")
     )

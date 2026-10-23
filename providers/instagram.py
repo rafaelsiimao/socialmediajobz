@@ -378,27 +378,54 @@ class InstagramProvider(SocialProvider):
     # Analytics
     # ------------------------------------------------------------------
 
+    # Media insights metrics per product type. ``impressions``/``engagement``
+    # were deprecated by Meta (media created after 2024-07-02 returns an error).
+    MEDIA_INSIGHT_METRICS = {
+        "STORY": ["reach", "views", "shares", "total_interactions", "replies"],
+        "REELS": ["reach", "views", "likes", "comments", "shares", "saved", "total_interactions"],
+        "FEED": ["reach", "views", "likes", "comments", "shares", "saved", "total_interactions"],
+    }
+
     def get_post_metrics(self, access_token: str, post_id: str) -> PostMetrics:
-        metrics = ["impressions", "reach", "engagement", "saved"]
-        resp = self._request(
+        # Basic counters are available with instagram_basic even when insights fail.
+        media = self._request(
             "GET",
-            f"{BASE_URL}/{post_id}/insights",
+            f"{BASE_URL}/{post_id}",
             access_token=access_token,
-            params={"metric": ",".join(metrics)},
-        )
-        data = resp.json()
+            params={"fields": "like_count,comments_count,media_product_type"},
+        ).json()
+        product_type = media.get("media_product_type") or "FEED"
+        metrics = self.MEDIA_INSIGHT_METRICS.get(product_type, self.MEDIA_INSIGHT_METRICS["FEED"])
+
         values: dict = {}
-        for entry in data.get("data", []):
-            name = entry.get("name", "")
-            val = entry.get("values", [{}])[0].get("value", 0)
-            values[name] = val
+        insights_error = ""
+        try:
+            resp = self._request(
+                "GET",
+                f"{BASE_URL}/{post_id}/insights",
+                access_token=access_token,
+                params={"metric": ",".join(metrics)},
+            )
+            for entry in resp.json().get("data", []):
+                name = entry.get("name", "")
+                val = entry.get("values", [{}])[0].get("value", 0)
+                values[name] = val
+        except APIError as exc:
+            insights_error = str(exc)
 
         return PostMetrics(
-            impressions=values.get("impressions", 0),
+            impressions=values.get("views", 0),
             reach=values.get("reach", 0),
-            engagements=values.get("engagement", 0),
+            engagements=values.get("total_interactions", 0),
+            likes=values.get("likes", media.get("like_count", 0)),
+            comments=values.get("comments", media.get("comments_count", 0)),
+            shares=values.get("shares", 0),
             saves=values.get("saved", 0),
-            extra={"raw_insights": values},
+            extra={
+                "raw_insights": values,
+                "media_product_type": product_type,
+                "insights_error": insights_error,
+            },
         )
 
     def get_account_metrics(self, access_token: str, date_range: tuple[datetime, datetime]) -> AccountMetrics:

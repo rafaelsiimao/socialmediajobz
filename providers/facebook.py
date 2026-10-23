@@ -308,34 +308,27 @@ class FacebookProvider(SocialProvider):
     # ------------------------------------------------------------------
 
     def get_post_metrics(self, access_token: str, post_id: str) -> PostMetrics:
-        metrics = [
-            "post_impressions",
-            "post_engaged_users",
-            "post_clicks",
-            "post_reactions_by_type_total",
-        ]
-        resp = self._request(
+        # Post-level counters only need pages_read_engagement. Insights metrics
+        # (post_impressions, post_engaged_users) were deprecated by Meta and
+        # their replacements require read_insights, which this app does not request.
+        data = self._request(
             "GET",
-            f"{BASE_URL}/{post_id}/insights",
+            f"{BASE_URL}/{post_id}",
             access_token=access_token,
-            params={"metric": ",".join(metrics)},
-        )
-        data = resp.json()
-        values: dict = {}
-        for entry in data.get("data", []):
-            name = entry.get("name", "")
-            val = entry.get("values", [{}])[0].get("value", 0)
-            values[name] = val
-
-        reactions = values.get("post_reactions_by_type_total", {})
-        total_likes = reactions.get("like", 0) + reactions.get("love", 0) if isinstance(reactions, dict) else 0
+            params={
+                "fields": "shares,comments.summary(true).limit(0),reactions.summary(true).limit(0)",
+            },
+        ).json()
+        reactions = data.get("reactions", {}).get("summary", {}).get("total_count", 0)
+        comments = data.get("comments", {}).get("summary", {}).get("total_count", 0)
+        shares = data.get("shares", {}).get("count", 0)
 
         return PostMetrics(
-            impressions=values.get("post_impressions", 0),
-            engagements=values.get("post_engaged_users", 0),
-            clicks=values.get("post_clicks", 0),
-            likes=total_likes,
-            extra={"raw_insights": values},
+            likes=reactions,
+            comments=comments,
+            shares=shares,
+            engagements=reactions + comments + shares,
+            extra={"raw_fields": data},
         )
 
     def get_account_metrics(self, access_token: str, date_range: tuple[datetime, datetime]) -> AccountMetrics:
