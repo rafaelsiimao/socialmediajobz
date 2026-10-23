@@ -185,8 +185,47 @@ apenas pela criação deste arquivo.
   publicado, retry seguro); se falhar no meio da publicação, marca como
   publicado com `story_ids` e `story_errors` para não duplicar no retry.
   Métricas usam só o primeiro Story da sequência.
+- Commit `901d059` (prévia de Story e sequência).
+- **Futuro: página "Início" no estilo Buffer** (Rafael enviou 2 capturas
+  da Home do Buffer em 23/10/2026; só plano, nada implementado). Hoje,
+  após login, `apps/accounts/views.py:dashboard` redireciona direto para o
+  calendário; não existe página inicial do workspace.
+  Blocos da referência e como fazer aqui:
+  1. Saudação + data ("Boa tarde, Nome!" + data por extenso). Simples.
+  2. Faixa de indicadores (3 círculos):
+     - Sequência semanal: semanas seguidas com ≥1 post publicado
+       (`PlatformPost.published_at`). Sem migração. O selo "Top 15%" do
+       Buffer compara com outros usuários: não temos base, omitir.
+     - Metas de publicação: "1 de 3 metas atingidas". Precisa modelo novo
+       de meta por workspace (ex.: N posts/semana por rede) + migração +
+       tela simples para definir metas.
+     - Pontuação de comentários: no Buffer é métrica própria. Proposta:
+       % de comentários respondidos nos últimos 7 dias vs semana anterior
+       (Inbox: `InboxMessage` + `InboxReply`/status resolvido).
+  3. "Pulso da semana" (semana atual vs anterior): Posts publicados
+     (contagem, sem migração); Total de seguidores (soma de
+     `SocialAccount.follower_count`, já atualizado a cada 6h; a variação
+     semanal exige histórico → modelo `FollowerSnapshot` diário +
+     migração); Comentários recebidos (Inbox).
+  4. Últimos rascunhos: 3 cards com rede, início da legenda e miniatura
+     (Posts em rascunho; já existe, só listar). Clique abre o Composer.
+  5. "A seguir": próximos agendados (PlatformPost `scheduled`), com estado
+     vazio "Nenhum post agendado" + botão Criar post.
+  6. Comentários sem resposta: lista curta do Inbox com @usuário e texto;
+     clique leva ao Inbox. Depende da sincronização do Inbox.
+  7. Modelos: 4 cards de ideias/modelos (já existem `PostTemplate` e
+     `apps/composer/builtin_templates.py`); clique abre o Composer com o
+     modelo. Textos em português, adaptados à Jobz.
+  8. "Do blog": conteúdo externo do Buffer. Sugestão: omitir ou trocar
+     por algo interno (ex.: melhores horários dos `PostingSlot`). Não
+     assumir que a Jobz tem blog/feed sem confirmar com Rafael.
+  Menu lateral: adicionar item "Início" no topo; o login passa a abrir o
+  Início em vez do calendário.
+  Ordem sugerida: (a) página + blocos sem migração (1, 2a, 3 posts/
+  comentários, 4, 5, 6, 7); (b) histórico de seguidores; (c) metas de
+  publicação; (d) pontuação de comentários. Tudo em português.
 - Pendentes: importação do histórico do Instagram, reformulação do Inbox,
-  correção das métricas do Facebook.
+  página Início, correção das métricas do Facebook.
 
 ## Novas funcionalidades planejadas (ordem combinada)
 
