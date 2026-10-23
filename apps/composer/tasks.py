@@ -24,9 +24,9 @@ def refresh_post_metrics():
 def import_instagram_history_task(account_id, days=None):
     """Import posts made directly in Instagram for one account (manual button)."""
     from apps.composer.importer import IMPORT_DAYS, import_instagram_history
-    from apps.social_accounts.models import SocialAccount
+    from apps.social_accounts.models import INSTAGRAM_PLATFORMS, SocialAccount
 
-    account = SocialAccount.objects.filter(id=account_id, platform="instagram").first()
+    account = SocialAccount.objects.filter(id=account_id, platform__in=INSTAGRAM_PLATFORMS).first()
     if account is None:
         logger.warning("Instagram import skipped: account %s not found", account_id)
         return
@@ -45,10 +45,10 @@ def sync_instagram_history():
     Registered as a recurring task (every 24h) in ComposerConfig.
     """
     from apps.composer.importer import DAILY_SYNC_DAYS, import_instagram_history
-    from apps.social_accounts.models import SocialAccount
+    from apps.social_accounts.models import INSTAGRAM_PLATFORMS, SocialAccount
 
     accounts = SocialAccount.objects.filter(
-        platform="instagram", connection_status=SocialAccount.ConnectionStatus.CONNECTED
+        platform__in=INSTAGRAM_PLATFORMS, connection_status=SocialAccount.ConnectionStatus.CONNECTED
     ).select_related("workspace")
     for account in accounts:
         try:

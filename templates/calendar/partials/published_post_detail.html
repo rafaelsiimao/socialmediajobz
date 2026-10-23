@@ -47,7 +47,7 @@ Loaded via HTMX into #post-detail-content (modal in calendar.html).
             <div class="rounded-xl bg-stone-50 px-3 py-2.5"><p class="text-lg font-semibold text-stone-900 tabular-nums">{{ pp.metrics.likes }}</p><p class="text-[11px] text-stone-500">Curtidas</p></div>
             <div class="rounded-xl bg-stone-50 px-3 py-2.5"><p class="text-lg font-semibold text-stone-900 tabular-nums">{{ pp.metrics.comments }}</p><p class="text-[11px] text-stone-500">Comentários</p></div>
             <div class="rounded-xl bg-stone-50 px-3 py-2.5"><p class="text-lg font-semibold text-stone-900 tabular-nums">{{ pp.metrics.shares }}</p><p class="text-[11px] text-stone-500">Compartilhamentos</p></div>
-            {% if pp.social_account.platform == "instagram" %}
+            {% if pp.social_account.is_instagram %}
             <div class="rounded-xl bg-stone-50 px-3 py-2.5"><p class="text-lg font-semibold text-stone-900 tabular-nums">{{ pp.metrics.saves }}</p><p class="text-[11px] text-stone-500">Salvamentos</p></div>
             {% endif %}
             {% if pp.metrics.interactions %}

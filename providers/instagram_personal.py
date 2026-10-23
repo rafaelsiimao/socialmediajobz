@@ -15,7 +15,14 @@ from datetime import datetime
 from urllib.parse import urlencode
 
 from .base import SocialProvider
-from .exceptions import APIError, OAuthError, PublishError
+from .exceptions import APIError, OAuthError, ProviderError, PublishError
+from .instagram import (
+    MAX_STORY_SEQUENCE,
+    _is_image_url,
+    _is_video_url,
+    _parse_ig_time,
+    normalize_collaborators,
+)
 from .types import (
     AccountMetrics,
     AccountProfile,
@@ -92,6 +99,7 @@ class InstagramPersonalProvider(SocialProvider):
             "instagram_business_content_publish",
             "instagram_business_manage_comments",
             "instagram_business_manage_messages",
+            "instagram_business_manage_insights",
         ]
 
     @property
@@ -233,26 +241,41 @@ class InstagramPersonalProvider(SocialProvider):
                 "Instagram requires at least one media item",
                 platform=self.platform_name,
             )
+        try:
+            collaborators = normalize_collaborators(content.extra.get("collaborators"))
+        except ValueError as exc:
+            raise PublishError(str(exc), platform=self.platform_name) from exc
+        if collaborators and content.post_type not in (PostType.IMAGE, PostType.CAROUSEL, PostType.REEL):
+            raise PublishError(
+                "Colaboração está disponível apenas para fotos, carrosséis e Reels.", platform=self.platform_name
+            )
+        if content.post_type == PostType.STORY and len(content.media_urls) > MAX_STORY_SEQUENCE:
+            raise PublishError(
+                f"Story aceita de 1 a {MAX_STORY_SEQUENCE} imagens ou vídeos (um Story por mídia).",
+                platform=self.platform_name,
+            )
+        if content.post_type == PostType.REEL and (
+            len(content.media_urls) != 1 or _is_image_url(content.media_urls[0])
+        ):
+            raise PublishError("Reel aceita exatamente 1 vídeo.", platform=self.platform_name)
 
+        if content.post_type == PostType.STORY:
+            return self._publish_story_sequence(access_token, content)
         if content.post_type == PostType.CAROUSEL and len(content.media_urls) > 1:
-            return self._publish_carousel(access_token, content)
-        return self._publish_single(access_token, content)
+            return self._publish_carousel(access_token, content, collaborators=collaborators)
+        return self._publish_single(access_token, content, collaborators=collaborators)
 
-    def _publish_single(self, access_token: str, content: PublishContent) -> PublishResult:
+    def _publish_single(self, access_token: str, content: PublishContent, *, collaborators=None) -> PublishResult:
+        """Publish a single image or Reel."""
         payload: dict = {}
         if content.text:
             payload["caption"] = content.text
+        if collaborators:
+            payload["collaborators"] = collaborators
 
         if content.post_type == PostType.REEL:
             payload["media_type"] = "REELS"
             payload["video_url"] = content.media_urls[0]
-        elif content.post_type == PostType.STORY:
-            url = content.media_urls[0]
-            payload["media_type"] = "STORIES"
-            if url.lower().endswith((".mp4", ".mov")):
-                payload["video_url"] = url
-            else:
-                payload["image_url"] = url
         else:
             # Default IMAGE
             payload["image_url"] = content.media_urls[0]
@@ -261,13 +284,45 @@ class InstagramPersonalProvider(SocialProvider):
         self._wait_for_container(access_token, container_id)
         return self._publish_container(access_token, container_id)
 
-    def _publish_carousel(self, access_token: str, content: PublishContent) -> PublishResult:
+    def _publish_story_sequence(self, access_token: str, content: PublishContent) -> PublishResult:
+        """Publish each media as its own Story, in order (captions are not supported).
+
+        All containers are processed before anything is published, so a media
+        failure leaves nothing live and the engine can retry safely.
+        """
+        container_ids = []
+        for url in content.media_urls:
+            media_key = "video_url" if _is_video_url(url) else "image_url"
+            container_id = self._create_container(access_token, {"media_type": "STORIES", media_key: url})
+            self._wait_for_container(access_token, container_id)
+            container_ids.append(container_id)
+
+        published: list[PublishResult] = []
+        for container_id in container_ids:
+            try:
+                published.append(self._publish_container(access_token, container_id))
+            except ProviderError as exc:
+                if not published:
+                    raise
+                logger.warning("Story sequence stopped after %d of %d: %s", len(published), len(container_ids), exc)
+                return self._story_sequence_result(
+                    published, error=f"{len(published)} de {len(container_ids)} Stories publicados: {exc}"
+                )
+        return self._story_sequence_result(published)
+
+    @staticmethod
+    def _story_sequence_result(published: list[PublishResult], error: str = "") -> PublishResult:
+        extra: dict = {"story_ids": [result.platform_post_id for result in published]}
+        if error:
+            extra["story_errors"] = error
+        return PublishResult(platform_post_id=published[0].platform_post_id, url=published[0].url, extra=extra)
+
+    def _publish_carousel(self, access_token: str, content: PublishContent, *, collaborators=None) -> PublishResult:
         child_ids: list[str] = []
 
         for url in content.media_urls:
-            is_video = url.lower().endswith((".mp4", ".mov"))
             child_payload: dict = {"is_carousel_item": True}
-            if is_video:
+            if _is_video_url(url):
                 child_payload["media_type"] = "VIDEO"
                 child_payload["video_url"] = url
             else:
@@ -283,6 +338,8 @@ class InstagramPersonalProvider(SocialProvider):
         }
         if content.text:
             carousel_payload["caption"] = content.text
+        if collaborators:
+            carousel_payload["collaborators"] = collaborators
 
         carousel_id = self._create_container(access_token, carousel_payload)
         self._wait_for_container(access_token, carousel_id)
@@ -366,28 +423,70 @@ class InstagramPersonalProvider(SocialProvider):
     # Analytics
     # ------------------------------------------------------------------
 
+    MEDIA_INSIGHT_METRICS = {
+        "STORY": ["reach", "views", "shares", "total_interactions", "replies"],
+        "REELS": ["reach", "views", "likes", "comments", "shares", "saved", "total_interactions"],
+        "FEED": ["reach", "views", "likes", "comments", "shares", "saved", "total_interactions"],
+    }
+    HISTORY_FIELDS = "id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp"
+
     def get_post_metrics(self, access_token: str, post_id: str) -> PostMetrics:
-        metrics = ["impressions", "reach", "engagement", "saved"]
-        resp = self._request(
+        media = self._request(
             "GET",
-            f"{API_BASE}/{post_id}/insights",
+            f"{API_BASE}/{post_id}",
             access_token=access_token,
-            params={"metric": ",".join(metrics)},
-        )
-        data = resp.json()
+            params={"fields": "like_count,comments_count,media_product_type,permalink"},
+        ).json()
+        product_type = media.get("media_product_type") or "FEED"
+        metrics = self.MEDIA_INSIGHT_METRICS.get(product_type, self.MEDIA_INSIGHT_METRICS["FEED"])
+
         values: dict = {}
-        for entry in data.get("data", []):
-            name = entry.get("name", "")
-            val = entry.get("values", [{}])[0].get("value", 0)
-            values[name] = val
+        insights_error = ""
+        try:
+            resp = self._request(
+                "GET",
+                f"{API_BASE}/{post_id}/insights",
+                access_token=access_token,
+                params={"metric": ",".join(metrics)},
+            )
+            for entry in resp.json().get("data", []):
+                values[entry.get("name", "")] = entry.get("values", [{}])[0].get("value", 0)
+        except APIError as exc:
+            insights_error = str(exc)
 
         return PostMetrics(
-            impressions=values.get("impressions", 0),
+            impressions=values.get("views", 0),
             reach=values.get("reach", 0),
-            engagements=values.get("engagement", 0),
+            engagements=values.get("total_interactions", 0),
+            likes=values.get("likes", media.get("like_count", 0)),
+            comments=values.get("comments", media.get("comments_count", 0)),
+            shares=values.get("shares", 0),
             saves=values.get("saved", 0),
-            extra={"raw_insights": values},
+            extra={
+                "raw_insights": values,
+                "media_product_type": product_type,
+                "permalink": media.get("permalink", ""),
+                "insights_error": insights_error,
+            },
         )
+
+    def list_media(self, access_token: str, since: datetime | None = None, max_items: int = 500) -> list[dict]:
+        """List feed posts and Reels newest first, stopping at ``since`` (no Stories)."""
+        url: str | None = f"{API_BASE}/me/media"
+        params: dict | None = {"fields": self.HISTORY_FIELDS, "limit": 50}
+        items: list[dict] = []
+        while url and len(items) < max_items:
+            data = self._request("GET", url, access_token=access_token, params=params).json()
+            params = None  # the "next" URL already carries the query
+            for media in data.get("data", []):
+                timestamp = _parse_ig_time(media["timestamp"])
+                if since and timestamp < since:
+                    return items
+                items.append({**media, "timestamp": timestamp})
+                if len(items) >= max_items:
+                    break
+            url = data.get("paging", {}).get("next")
+        return items
 
     def get_account_metrics(self, access_token: str, date_range: tuple[datetime, datetime]) -> AccountMetrics:
         metrics = ["impressions", "reach", "follower_count", "profile_views"]
@@ -421,41 +520,111 @@ class InstagramPersonalProvider(SocialProvider):
     # Inbox
     # ------------------------------------------------------------------
 
-    def get_messages(self, access_token: str, since: datetime | None = None) -> list[InboxMessage]:
-        params: dict = {"fields": "id,participants,messages{id,message,from,created_time}"}
-        if since:
-            params["since"] = int(since.timestamp())
+    INBOX_MEDIA_LIMIT = 25
 
+    def get_messages(self, access_token: str, since: datetime | None = None) -> list[InboxMessage]:
+        """Comments on recent media plus Instagram DMs.
+
+        Own replies are skipped. If DMs fail (missing permission), comments are
+        still returned.
+        """
+        own_id = self.credentials.get("ig_user_id", "")
+        messages = self._get_comments(access_token, own_id, since)
+        try:
+            messages.extend(self._get_direct_messages(access_token, own_id, since))
+        except APIError as exc:
+            logger.warning("Instagram DMs unavailable: %s", exc)
+        return messages
+
+    def _get_comments(self, access_token: str, own_id: str, since: datetime | None) -> list[InboxMessage]:
+        resp = self._request(
+            "GET",
+            f"{API_BASE}/me/media",
+            access_token=access_token,
+            params={
+                "fields": "id,caption,permalink,comments.limit(50){id,text,timestamp,username,from}",
+                "limit": self.INBOX_MEDIA_LIMIT,
+            },
+        )
+        messages: list[InboxMessage] = []
+        for media in resp.json().get("data", []):
+            for comment in media.get("comments", {}).get("data", []):
+                sender = comment.get("from", {})
+                timestamp = _parse_ig_time(comment["timestamp"])
+                if (own_id and sender.get("id") == own_id) or (since and timestamp <= since):
+                    continue
+                username = sender.get("username") or comment.get("username", "")
+                messages.append(
+                    InboxMessage(
+                        platform_message_id=comment["id"],
+                        sender_id=sender.get("id", ""),
+                        sender_name=username,
+                        text=comment.get("text", ""),
+                        timestamp=timestamp,
+                        message_type="comment",
+                        extra={
+                            "kind": "comment",
+                            "sender_handle": username,
+                            "media_id": media["id"],
+                            "permalink": media.get("permalink", ""),
+                            "media_caption": (media.get("caption") or "")[:200],
+                        },
+                    )
+                )
+        return messages
+
+    def _get_direct_messages(self, access_token: str, own_id: str, since: datetime | None) -> list[InboxMessage]:
         resp = self._request(
             "GET",
             f"{API_BASE}/me/conversations",
             access_token=access_token,
-            params=params,
+            params={
+                "platform": "instagram",
+                "fields": "id,updated_time,messages.limit(20){id,message,from,created_time}",
+            },
         )
-        conversations = resp.json().get("data", [])
-
         messages: list[InboxMessage] = []
-        for convo in conversations:
+        for convo in resp.json().get("data", []):
             for msg in convo.get("messages", {}).get("data", []):
                 sender = msg.get("from", {})
+                timestamp = _parse_ig_time(msg["created_time"])
+                if (own_id and sender.get("id") == own_id) or (since and timestamp <= since):
+                    continue
+                username = sender.get("username", "")
                 messages.append(
                     InboxMessage(
                         platform_message_id=msg["id"],
                         sender_id=sender.get("id", ""),
-                        sender_name=sender.get("name", sender.get("username", "")),
+                        sender_name=username,
                         text=msg.get("message", ""),
-                        timestamp=datetime.fromisoformat(msg["created_time"].replace("+0000", "+00:00")),
+                        timestamp=timestamp,
                         message_type="dm",
-                        extra={"conversation_id": convo["id"]},
+                        extra={
+                            "kind": "dm",
+                            "sender_handle": username,
+                            "conversation_id": convo["id"],
+                            "sender_id": sender.get("id", ""),
+                        },
                     )
                 )
         return messages
 
     def reply_to_message(self, access_token: str, message_id: str, text: str, extra: dict | None = None) -> ReplyResult:
-        """Reply to a conversation. message_id should be the conversation ID."""
+        """Reply to a comment (public reply) or to a DM (Instagram 24h window)."""
+        extra = extra or {}
+        if extra.get("kind") == "dm":
+            resp = self._request(
+                "POST",
+                f"{API_BASE}/me/messages",
+                access_token=access_token,
+                json={"recipient": {"id": extra["sender_id"]}, "message": {"text": text}},
+            )
+            data = resp.json()
+            return ReplyResult(platform_message_id=data.get("message_id", ""), extra=data)
+
         resp = self._request(
             "POST",
-            f"{API_BASE}/{message_id}/messages",
+            f"{API_BASE}/{message_id}/replies",
             access_token=access_token,
             json={"message": text},
         )

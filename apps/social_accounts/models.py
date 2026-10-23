@@ -7,6 +7,9 @@ from apps.common.encryption import EncryptedTextField
 from apps.common.managers import WorkspaceScopedManager
 from apps.credentials.models import PlatformCredential
 
+# Both Instagram connectors (Facebook Login and Instagram Login) share features.
+INSTAGRAM_PLATFORMS = ("instagram", "instagram_personal")
+
 
 class SocialAccount(models.Model):
     class ConnectionStatus(models.TextChoices):
@@ -63,6 +66,10 @@ class SocialAccount(models.Model):
 
     def __str__(self):
         return f"{self.account_name} ({self.get_platform_display()})"
+
+    @property
+    def is_instagram(self):
+        return self.platform in INSTAGRAM_PLATFORMS
 
     @property
     def is_token_expiring_soon(self) -> bool:

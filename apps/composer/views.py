@@ -22,7 +22,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from apps.members.decorators import require_permission
 from apps.members.models import WorkspaceMembership
-from apps.social_accounts.models import SocialAccount
+from apps.social_accounts.models import INSTAGRAM_PLATFORMS, SocialAccount
 from apps.workspaces.models import Workspace
 from providers.instagram import normalize_collaborators
 
@@ -58,7 +58,7 @@ def _get_workspace(request, workspace_id):
 
 def _instagram_collaborators(request, workspace):
     selected = [value.strip() for value in request.POST.get("selected_accounts", "").split(",") if value.strip()]
-    accounts = SocialAccount.objects.filter(workspace=workspace, platform="instagram", id__in=selected)
+    accounts = SocialAccount.objects.filter(workspace=workspace, platform__in=INSTAGRAM_PLATFORMS, id__in=selected)
     return {
         str(account.id): normalize_collaborators(request.POST[f"ig_collaborators_{account.id}"])
         for account in accounts
@@ -82,7 +82,7 @@ def _instagram_formats(request, workspace, collaborators=None):
     accepts collaborators on feed photos, carousels and Reels).
     """
     selected = [value.strip() for value in request.POST.get("selected_accounts", "").split(",") if value.strip()]
-    accounts = SocialAccount.objects.filter(workspace=workspace, platform="instagram", id__in=selected)
+    accounts = SocialAccount.objects.filter(workspace=workspace, platform__in=INSTAGRAM_PLATFORMS, id__in=selected)
     formats = {
         str(account.id): request.POST[f"ig_format_{account.id}"]
         for account in accounts
@@ -166,10 +166,10 @@ def _sync_platform_posts(request, post, workspace, initial_status=None):
             }
 
         collaborators = getattr(request, "instagram_collaborators", {})
-        if account.platform == "instagram" and acc_id in collaborators:
+        if account.is_instagram and acc_id in collaborators:
             _set_collaborators(pp, collaborators[acc_id])
         formats = getattr(request, "instagram_formats", {})
-        if account.platform == "instagram" and acc_id in formats:
+        if account.is_instagram and acc_id in formats:
             _set_post_format(pp, formats[acc_id])
         pp.save()
 
@@ -1047,7 +1047,7 @@ def preview(request, workspace_id):
                     else effective_caption,
                     "needs_title": field_config["needs_title"],
                     "ig_format": request.GET.get(f"ig_format_{account.id}", "feed")
-                    if account.platform == "instagram"
+                    if account.is_instagram
                     else "",
                 }
             )

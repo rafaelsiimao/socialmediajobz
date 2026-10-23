@@ -86,7 +86,7 @@ Shows all published/partially_published platform posts. Loaded via HTMX into #ta
                         {% if pp.metrics.saves %}<span title="Salvamentos">🔖 {{ pp.metrics.saves }}</span>{% endif %}
                     </div>
                     <span class="text-[10px] text-stone-400">Atualizado em {{ pp.metrics.fetched_at|date:"d/m \à\s H:i" }}</span>
-                    {% elif pp.status == "published" and pp.social_account.platform == "instagram" %}
+                    {% elif pp.status == "published" and pp.social_account.is_instagram %}
                     <span class="text-stone-300" title="{{ pp.metrics.last_error|default:'Aguardando a próxima atualização' }}">Aguardando métricas</span>
                     {% else %}
                     <span class="text-stone-300">-</span>

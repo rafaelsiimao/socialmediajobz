@@ -23,7 +23,7 @@ INITIAL_SYNC_DAYS = 30
 
 def _account_credentials(account):
     """Per-account IDs the providers need to address the right Page/IG user."""
-    if account.platform == "instagram":
+    if account.is_instagram:
         return {"ig_user_id": account.account_platform_id}
     if account.platform == "facebook":
         return {"page_id": account.account_platform_id}

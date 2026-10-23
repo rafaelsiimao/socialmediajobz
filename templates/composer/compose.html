@@ -356,7 +356,7 @@
 
                 <!-- Instagram format (Post / Reel / Story) per selected account, above the caption -->
                 {% for account in social_accounts %}
-                {% if account.platform == 'instagram' %}
+                {% if account.is_instagram %}
                 <div x-show="selectedAccounts.includes('{{ account.id }}')" x-cloak
                      x-data="{ igFormat: '{{ account.ig_format }}' }"
                      class="rounded-xl border border-stone-200 bg-white p-4">
@@ -735,7 +735,7 @@
 
                 <!-- Instagram collaborators are kept per connected account. -->
                 {% for account in social_accounts %}
-                {% if account.platform == 'instagram' %}
+                {% if account.is_instagram %}
                 <div x-show="selectedAccounts.includes('{{ account.id }}') && igFormat !== 'story'" x-cloak
                      x-data="{ igFormat: '{{ account.ig_format }}' }"
                      @ig-format-change.window="if ($event.detail.account === '{{ account.id }}') igFormat = $event.detail.value"

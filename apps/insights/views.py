@@ -12,7 +12,7 @@ from django.views.decorators.http import require_POST
 
 from apps.composer.models import PlatformPostMetrics
 from apps.members.models import WorkspaceMembership
-from apps.social_accounts.models import SocialAccount
+from apps.social_accounts.models import INSTAGRAM_PLATFORMS, SocialAccount
 from apps.workspaces.models import Workspace
 
 from . import services
@@ -142,7 +142,7 @@ def import_history(request, workspace_id):
 
     workspace = _get_workspace(request, workspace_id)
     accounts = SocialAccount.objects.filter(
-        workspace=workspace, platform="instagram", connection_status=SocialAccount.ConnectionStatus.CONNECTED
+        workspace=workspace, platform__in=INSTAGRAM_PLATFORMS, connection_status=SocialAccount.ConnectionStatus.CONNECTED
     )
     for account in accounts:
         import_instagram_history_task(str(account.id))

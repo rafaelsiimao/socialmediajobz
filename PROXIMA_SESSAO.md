@@ -327,6 +327,14 @@ apenas pela criação deste arquivo.
   conector "instagram" via Facebook). Bug conhecido no conector
   "instagram" (Facebook Login): conecta e PUBLICA no primeiro Instagram do
   login (não escolhe conta; engine não injeta ig_user_id).
+- **Paridade do conector Instagram (Personal) (implementado localmente):**
+  provider `instagram_personal` ganhou Story em sequência, Reel com
+  validação, colaboradores, métricas atuais, `list_media` (importação) e
+  Inbox (comentários + DMs com resposta). App trata os dois conectores
+  igual via `INSTAGRAM_PLATFORMS`/`SocialAccount.is_instagram` (Composer,
+  métricas, importação, Inbox, engine). Novo scope
+  `instagram_business_manage_insights`: adicionar em Permissões e recursos
+  do caso de uso "API do Instagram" no painel Meta.
 - Pendentes: reformulação do Inbox,
   página Início, lembrete de publicação manual
   (stickers), correção das métricas do Facebook.
