@@ -128,6 +128,12 @@ apenas pela criação deste arquivo.
   link "Ver na rede social" (permalink). Rotas `calendar:published_post_detail`
   e `published_post_refresh_metrics`. Conferido no navegador com banco
   temporário; 169 testes passaram.
+  Commit `863034c`.
+- Ajustes do modal: desempenho no topo, carrossel com setas e pontos (um
+  slide por vez), legenda em 2 linhas com "Ver completa". Erro do Facebook
+  "nonexisting field (shares)" corrigido: posts com foto guardavam o ID da
+  foto; agora a publicação guarda o `post_id` do feed e as métricas resolvem
+  `page_story_id` para posts antigos (fallback sem `shares` para vídeos).
 - Pendentes: Stories, importação do histórico do Instagram.
 
 ## Novas funcionalidades planejadas (ordem combinada)

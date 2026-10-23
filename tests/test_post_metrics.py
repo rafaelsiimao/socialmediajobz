@@ -201,3 +201,58 @@ def test_refresh_button_fetches_metrics(client, published_post):
         )
     assert response.status_code == 200
     assert PlatformPostMetrics.objects.get(platform_post=platform_post).likes == 7
+
+
+def test_facebook_metrics_resolve_photo_id_to_feed_post():
+    calls = []
+
+    def fake_request(self, method, url, **kwargs):
+        object_id = url.rsplit("/", 1)[-1]
+        fields = kwargs["params"]["fields"]
+        calls.append((object_id, fields))
+        if object_id == "photo-1" and "shares" in fields:
+            raise APIError('(#100) Tried accessing nonexisting field (shares)', status_code=400)
+        if object_id == "photo-1":
+            return _response({"page_story_id": "page_post"})
+        return _response(
+            {
+                "permalink_url": "https://www.facebook.com/page/posts/1",
+                "shares": {"count": 2},
+                "comments": {"summary": {"total_count": 1}},
+                "reactions": {"summary": {"total_count": 6}},
+            }
+        )
+
+    with patch.object(SocialProvider, "_request", fake_request):
+        metrics = FacebookProvider({}).get_post_metrics("token", "photo-1")
+
+    assert calls[-1][0] == "page_post"
+    assert (metrics.likes, metrics.comments, metrics.shares) == (6, 1, 2)
+    assert metrics.extra["permalink"] == "https://www.facebook.com/page/posts/1"
+
+
+def test_facebook_metrics_fall_back_to_media_counters():
+    def fake_request(self, method, url, **kwargs):
+        fields = kwargs["params"]["fields"]
+        if "shares" in fields or fields == "page_story_id":
+            raise APIError("(#100) nonexisting field", status_code=400)
+        return _response({"comments": {"summary": {"total_count": 3}}, "reactions": {"summary": {"total_count": 4}}})
+
+    with patch.object(SocialProvider, "_request", fake_request):
+        metrics = FacebookProvider({}).get_post_metrics("token", "video-1")
+
+    assert (metrics.likes, metrics.comments, metrics.shares) == (4, 3, 0)
+
+
+def test_facebook_photo_publish_stores_feed_post_id():
+    from providers.types import PostType, PublishContent
+
+    def fake_request(self, method, url, **kwargs):
+        return _response({"id": "photo-1", "post_id": "page_post"})
+
+    with patch.object(SocialProvider, "_request", fake_request):
+        result = FacebookProvider({})._publish_photo(
+            "token", "page", PublishContent(text="Oi", media_urls=["https://x/img.jpg"], post_type=PostType.IMAGE)
+        )
+
+    assert result.platform_post_id == "page_post"

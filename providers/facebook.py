@@ -266,9 +266,12 @@ class FacebookProvider(SocialProvider):
             json=payload,
         )
         data = resp.json()
+        # Store the Page post ID (not the photo ID) so post fields like
+        # ``shares`` and comments/metrics resolve against the feed post.
+        post_id = data.get("post_id") or data["id"]
         return PublishResult(
-            platform_post_id=data["id"],
-            url=f"https://www.facebook.com/{data.get('post_id', data['id'])}",
+            platform_post_id=post_id,
+            url=f"https://www.facebook.com/{post_id}",
             extra=data,
         )
 
@@ -307,18 +310,36 @@ class FacebookProvider(SocialProvider):
     # Analytics
     # ------------------------------------------------------------------
 
+    POST_METRIC_FIELDS = "permalink_url,shares,comments.summary(true).limit(0),reactions.summary(true).limit(0)"
+    MEDIA_METRIC_FIELDS = "comments.summary(true).limit(0),reactions.summary(true).limit(0)"
+
+    def _get_fields(self, access_token: str, object_id: str, fields: str) -> dict:
+        return self._request(
+            "GET",
+            f"{BASE_URL}/{object_id}",
+            access_token=access_token,
+            params={"fields": fields},
+        ).json()
+
+    def _metrics_for_media_id(self, access_token: str, media_id: str) -> dict:
+        try:
+            story_id = self._get_fields(access_token, media_id, "page_story_id").get("page_story_id")
+        except APIError:
+            story_id = None
+        if story_id:
+            return self._get_fields(access_token, story_id, self.POST_METRIC_FIELDS)
+        return self._get_fields(access_token, media_id, self.MEDIA_METRIC_FIELDS)
+
     def get_post_metrics(self, access_token: str, post_id: str) -> PostMetrics:
         # Post-level counters only need pages_read_engagement. Insights metrics
         # (post_impressions, post_engaged_users) were deprecated by Meta and
         # their replacements require read_insights, which this app does not request.
-        data = self._request(
-            "GET",
-            f"{BASE_URL}/{post_id}",
-            access_token=access_token,
-            params={
-                "fields": "permalink_url,shares,comments.summary(true).limit(0),reactions.summary(true).limit(0)",
-            },
-        ).json()
+        try:
+            data = self._get_fields(access_token, post_id, self.POST_METRIC_FIELDS)
+        except APIError:
+            # Older photo/video posts stored the media ID, which has no ``shares``
+            # field. Resolve the feed post behind a photo, else read media counters.
+            data = self._metrics_for_media_id(access_token, post_id)
         reactions = data.get("reactions", {}).get("summary", {}).get("total_count", 0)
         comments = data.get("comments", {}).get("summary", {}).get("total_count", 0)
         shares = data.get("shares", {}).get("count", 0)

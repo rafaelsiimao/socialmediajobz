@@ -22,26 +22,6 @@ Loaded via HTMX into #post-detail-content (modal in calendar.html).
 </div>
 
 <div class="overflow-y-auto px-5 py-4 space-y-4" style="max-height: calc(90vh - 80px);">
-    {% with attachments=pp.post.media_attachments.all %}
-    {% if attachments %}
-    <div class="flex gap-2 overflow-x-auto snap-x snap-mandatory rounded-xl">
-        {% for att in attachments %}
-        <div class="snap-center flex-shrink-0 {% if attachments|length > 1 %}w-[85%]{% else %}w-full{% endif %} aspect-[4/5] bg-stone-100 rounded-xl overflow-hidden">
-            {% if att.media_asset.is_video %}
-            <video src="{{ att.media_asset.file.url }}" class="w-full h-full object-cover" controls preload="metadata"></video>
-            {% else %}
-            <img src="{{ att.media_asset.file.url }}" alt="{{ att.alt_text }}" class="w-full h-full object-cover">
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
-
-    {% if pp.effective_caption %}
-    <p class="text-sm text-stone-700 whitespace-pre-line break-words">{{ pp.effective_caption }}</p>
-    {% endif %}
-
     <div>
         <div class="flex items-center justify-between mb-2">
             <h3 class="text-xs font-semibold text-stone-400 uppercase tracking-wider">Desempenho</h3>
@@ -86,6 +66,51 @@ Loaded via HTMX into #post-detail-content (modal in calendar.html).
         <p class="text-sm text-stone-400">Aguardando a primeira atualização das métricas.</p>
         {% endif %}
     </div>
+
+    {% with attachments=pp.post.media_attachments.all %}
+    {% if attachments %}
+    <div x-data="{ slide: 0, total: {{ attachments|length }} }" class="relative mx-auto w-full max-w-[280px]">
+        <div class="relative aspect-[4/5] bg-stone-100 rounded-xl overflow-hidden">
+            {% for att in attachments %}
+            <div x-show="slide === {{ forloop.counter0 }}" {% if not forloop.first %}style="display: none;"{% endif %} class="absolute inset-0">
+                {% if att.media_asset.is_video %}
+                <video src="{{ att.media_asset.file.url }}" class="w-full h-full object-cover" controls preload="metadata"></video>
+                {% else %}
+                <img src="{{ att.media_asset.file.url }}" alt="{{ att.alt_text }}" class="w-full h-full object-cover">
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% if attachments|length > 1 %}
+        <button type="button" x-show="slide > 0" @click="slide--" style="display: none;"
+                class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center text-stone-700 hover:bg-white cursor-pointer" aria-label="Anterior">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <button type="button" x-show="slide < total - 1" @click="slide++"
+                class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center text-stone-700 hover:bg-white cursor-pointer" aria-label="Próximo">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="flex justify-center gap-1.5 mt-2">
+            {% for att in attachments %}
+            <button type="button" @click="slide = {{ forloop.counter0 }}"
+                    :class="slide === {{ forloop.counter0 }} ? 'bg-stone-700' : 'bg-stone-300'"
+                    class="w-1.5 h-1.5 rounded-full cursor-pointer" aria-label="Slide {{ forloop.counter }}"></button>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    {% if pp.effective_caption %}
+    <div x-data="{ expanded: false, clamped: false }"
+         x-init="$nextTick(() => clamped = $refs.caption.scrollHeight > $refs.caption.clientHeight)">
+        <p x-ref="caption" class="text-sm text-stone-700 whitespace-pre-line break-words" :class="expanded ? '' : 'line-clamp-2'">{{ pp.effective_caption }}</p>
+        <button type="button" x-show="clamped" @click="expanded = !expanded" style="display: none;"
+                class="mt-1 text-xs font-medium text-stone-500 hover:text-stone-900 cursor-pointer"
+                x-text="expanded ? 'Ver menos' : 'Ver completa'">Ver completa</button>
+    </div>
+    {% endif %}
 
     {% if pp.metrics.raw.permalink %}
     <a href="{{ pp.metrics.raw.permalink }}" target="_blank" rel="noopener noreferrer"
