@@ -1,26 +1,43 @@
 {% comment %}
 Queue tab partial for the Publish page.
-Shows all scheduled platform posts grouped by date. Loaded via HTMX into #tab-content.
+Shows scheduled platform posts and free posting slots ("+ Novo") grouped by day.
+Loaded via HTMX into #tab-content.
 {% endcomment %}
 {% load tz %}
 
 <div style="animation: slideUp 200ms cubic-bezier(0.16,1,0.3,1) both">
-    {% if platform_posts %}
-    {% regroup platform_posts by effective_at.date as date_groups %}
-    {% for group in date_groups %}
+    {% if day_groups %}
+    {% for group in day_groups %}
     <div class="{% if not forloop.first %}mt-8{% endif %}">
         <!-- Date header -->
         <h3 class="text-base font-semibold text-stone-800 mb-4">
-            {% timezone display_timezone %}{{ group.grouper|date:"l, j F" }}{% endtimezone %}
+            {{ group.label }}, <span class="font-normal text-stone-500">{{ group.date_label }}</span>
         </h3>
 
         <div class="space-y-4">
-            {% for pp in group.list %}
+            {% for item in group.items %}
+            {% if item.kind == "slot" %}
+            <!-- Free posting slot -->
+            <div class="flex gap-4 items-center">
+                <div class="w-20 shrink-0 text-right text-sm font-semibold text-stone-700 tabular-nums">{{ item.local_time }}</div>
+                <a href="{% url 'composer:compose' workspace_id=workspace.id %}?account={{ item.account.id }}&scheduled_date={{ item.date }}&scheduled_time={{ item.time }}"
+                   class="flex-1 flex items-center gap-2 px-4 py-3 bg-white rounded-xl border border-stone-200 text-sm font-medium text-stone-500 hover:border-stone-300 hover:text-stone-800 transition-colors"
+                   title="Criar publicação para {{ item.account.account_name }} neste horário">
+                    <span class="w-5 h-5 rounded flex items-center justify-center">
+                        {% include "partials/_platform_icon.html" with platform=item.account.platform size="sm" %}
+                    </span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    Novo
+                    <span class="ml-auto text-xs text-stone-400 truncate">{{ item.account.account_name }}</span>
+                </a>
+            </div>
+            {% else %}
+            {% with pp=item.pp %}
             <div class="flex gap-4">
                 <!-- Left: time + source -->
                 <div class="w-20 shrink-0 pt-3 text-right">
                     <div class="text-sm font-semibold text-stone-700 tabular-nums">
-                        {% timezone display_timezone %}{{ pp.effective_at|date:"g:i A" }}{% endtimezone %}
+                        {{ item.local_time }}
                     </div>
                     <div class="text-[11px] text-stone-400 mt-0.5 flex items-center justify-end gap-1">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -81,7 +98,7 @@ Shows all scheduled platform posts grouped by date. Loaded via HTMX into #tab-co
                     <!-- Footer -->
                     <div class="flex items-center justify-between border-t border-stone-100 px-4 py-2.5">
                         <span class="text-xs text-stone-400">
-                            {{ pp.post.created_at|timesince }} ago
+                            Criado em {{ pp.post.created_at|date:"d/m" }}
                         </span>
                         <div class="flex items-center gap-1.5">
                             <a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=pp.post_id %}?account={{ pp.social_account_id }}&action=publish_now"
@@ -131,10 +148,21 @@ Shows all scheduled platform posts grouped by date. Loaded via HTMX into #tab-co
                     </div>
                 </div>
             </div>
+            {% endwith %}
+            {% endif %}
             {% endfor %}
         </div>
     </div>
     {% endfor %}
+    {% if more_slots_url %}
+    <div class="text-center mt-6">
+        <button type="button" hx-get="{{ more_slots_url }}" hx-target="#tab-content" hx-swap="innerHTML"
+                class="inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-800 cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Mais horários
+        </button>
+    </div>
+    {% endif %}
     {% else %}
     {% if not has_connected_accounts %}
     {% include "calendar/partials/_no_channels_empty_state.html" %}

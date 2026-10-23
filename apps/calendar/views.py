@@ -640,21 +640,99 @@ def publish_tab_queue(request, workspace_id):
     )
     platform_posts = _apply_pp_publish_filters(platform_posts, request)
 
-    has_connected_accounts = SocialAccount.objects.filter(
+    connected_accounts = SocialAccount.objects.filter(
         workspace=workspace,
         connection_status=SocialAccount.ConnectionStatus.CONNECTED,
-    ).exists()
+    )
+    has_connected_accounts = connected_accounts.exists()
+
+    try:
+        days = min(max(int(request.GET.get("days", QUEUE_SLOT_DAYS)), 1), QUEUE_SLOT_MAX_DAYS)
+    except ValueError:
+        days = QUEUE_SLOT_DAYS
+    channel = request.GET.get("channel")
+    slot_accounts = connected_accounts.filter(id=channel) if channel else connected_accounts
+    day_groups = _queue_day_groups(workspace, list(platform_posts[:200]), slot_accounts, display_tz, days)
+
+    more_params = request.GET.copy()
+    more_params["days"] = days + QUEUE_SLOT_DAYS
 
     return render(
         request,
         "calendar/partials/publish_queue.html",
         {
             "workspace": workspace,
-            "platform_posts": platform_posts[:200],
+            "day_groups": day_groups,
             "display_timezone": display_tz,
             "has_connected_accounts": has_connected_accounts,
+            "more_slots_url": (
+                f"{request.path}?{more_params.urlencode()}" if days < QUEUE_SLOT_MAX_DAYS else ""
+            ),
         },
     )
+
+
+# Free posting slots shown in the queue ("+ Novo" rows), like Buffer's recommended times.
+QUEUE_SLOT_DAYS = 7
+QUEUE_SLOT_MAX_DAYS = 28
+
+
+def _queue_day_groups(workspace, platform_posts, accounts, display_tz, days):
+    """Merge scheduled posts and free PostingSlots into per-day groups.
+
+    Returns [{"label": "Hoje", "date_label": "23 de outubro", "items": [...]}]
+    where each item is {"kind": "post", "pp", "at"} or
+    {"kind": "slot", "account", "at", "date", "time"} (date/time in the
+    workspace timezone, for prefilling the composer).
+    """
+    import zoneinfo
+
+    from django.utils import timezone as _tz
+
+    from .services import _next_slot_datetimes
+
+    display = zoneinfo.ZoneInfo(display_tz)
+    ws_tz = zoneinfo.ZoneInfo(workspace.effective_timezone or "UTC")
+    now_ws = _tz.now().astimezone(ws_tz)
+    horizon = now_ws + timedelta(days=days)
+
+    items = [{"kind": "post", "pp": pp, "at": pp.effective_at} for pp in platform_posts if pp.effective_at]
+    taken = {(pp.social_account_id, pp.effective_at.astimezone(ws_tz).replace(second=0, microsecond=0)) for pp in platform_posts if pp.effective_at}
+    for account in accounts:
+        for slot_dt in _next_slot_datetimes(account, now_ws, count=days * 10):
+            if slot_dt > horizon:
+                break
+            if (account.id, slot_dt) in taken:
+                continue
+            items.append(
+                {
+                    "kind": "slot",
+                    "account": account,
+                    "at": slot_dt,
+                    "date": slot_dt.strftime("%Y-%m-%d"),
+                    "time": slot_dt.strftime("%H:%M"),
+                }
+            )
+    items.sort(key=lambda item: item["at"])
+
+    today = _tz.now().astimezone(display).date()
+    groups = []
+    for item in items:
+        local = item["at"].astimezone(display)
+        item["local_time"] = local.strftime("%H:%M")
+        day = local.date()
+        if not groups or groups[-1]["date"] != day:
+            if day == today:
+                label = "Hoje"
+            elif day == today + timedelta(days=1):
+                label = "Amanhã"
+            else:
+                label = DAYS_PT[day.weekday()]
+            groups.append(
+                {"date": day, "label": label, "date_label": f"{day.day} de {MONTHS_PT[day.month - 1].lower()}", "items": []}
+            )
+        groups[-1]["items"].append(item)
+    return groups
 
 
 @login_required
