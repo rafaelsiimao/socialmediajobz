@@ -196,3 +196,54 @@ def test_preview_renders_story_layout_when_selected(client, instagram_editor):
     assert "aspect-ratio: 9/16" in story.content.decode()
     assert "Enviar mensagem" in story.content.decode()
     assert "aspect-ratio: 9/16" not in feed.content.decode()
+
+
+@pytest.mark.django_db
+def test_reel_format_is_saved_reloaded_and_cleared(client, instagram_editor, org_owner):
+    workspace, account = instagram_editor
+    post = Post.objects.create(workspace=workspace, author=org_owner, caption="Draft")
+    platform_post = post.platform_posts.create(social_account=account)
+    url = reverse("composer:save_post_edit", kwargs={"workspace_id": workspace.id, "post_id": post.id})
+    data = {"caption": "Draft", "action": "save_draft", "selected_accounts": str(account.id)}
+
+    client.post(url, {**data, f"ig_format_{account.id}": "reel", f"ig_collaborators_{account.id}": "@partner"})
+    platform_post.refresh_from_db()
+    assert platform_post.platform_extra == {"post_type": "reel", "collaborators": ["partner"]}
+    editor = client.get(reverse("composer:compose_edit", kwargs={"workspace_id": workspace.id, "post_id": post.id}))
+    assert b"igFormat: 'reel'" in editor.content
+
+    client.post(url, {**data, f"ig_format_{account.id}": "feed", f"ig_collaborators_{account.id}": "@partner"})
+    platform_post.refresh_from_db()
+    assert "post_type" not in platform_post.platform_extra
+
+
+@pytest.mark.parametrize(
+    ("platform", "extra", "expected"),
+    [
+        ("instagram", {}, PostType.REEL),
+        ("instagram", {"post_type": "reel"}, PostType.REEL),
+        ("facebook", {}, PostType.VIDEO),
+    ],
+)
+def test_single_instagram_video_resolves_to_reel(platform, extra, expected):
+    assert PublishEngine._resolve_post_type(platform, extra, 1, "video") == expected
+
+
+def test_reel_requires_one_video():
+    provider = InstagramProvider({"ig_user_id": "123"})
+    for urls in (["https://example.com/a.jpg"], ["https://example.com/a.mp4", "https://example.com/b.mp4"]):
+        content = PublishContent(post_type=PostType.REEL, media_urls=urls)
+        with patch.object(provider, "_create_container") as create, pytest.raises(PublishError):
+            provider.publish_post("token", content)
+        create.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_preview_renders_reel_layout(client, instagram_editor):
+    workspace, account = instagram_editor
+    body = client.get(
+        reverse("composer:preview", kwargs={"workspace_id": workspace.id}),
+        {"selected_accounts": str(account.id), f"ig_format_{account.id}": "reel", "caption": "Meu reel"},
+    ).content.decode()
+    assert "Áudio original" in body
+    assert "Enviar mensagem" not in body

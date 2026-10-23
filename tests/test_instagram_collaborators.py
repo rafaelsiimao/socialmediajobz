@@ -98,7 +98,11 @@ def test_publish_sends_collaborators_only_on_parent_container(post_type):
     content = PublishContent(
         text="Collaboration",
         post_type=post_type,
-        media_urls=["https://example.com/one.jpg", "https://example.com/two.jpg"],
+        media_urls=(
+            ["https://example.com/one.mp4"]
+            if post_type == PostType.REEL
+            else ["https://example.com/one.jpg", "https://example.com/two.jpg"]
+        ),
         extra={"collaborators": ["@Partner", "other"]},
     )
     with (

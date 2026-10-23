@@ -11,7 +11,7 @@ import httpx
 from dateutil import parser as date_parser
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models, transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -76,7 +76,7 @@ def _set_collaborators(platform_post, collaborators):
 
 
 def _instagram_formats(request, workspace, collaborators=None):
-    """Return {account_id: "story" | "feed"} from the per-account format radio.
+    """Return {account_id: "feed" | "reel" | "story"} from the per-account format radio.
 
     Raises ValueError when a Story also has collaborators (Instagram only
     accepts collaborators on feed photos, carousels and Reels).
@@ -86,7 +86,7 @@ def _instagram_formats(request, workspace, collaborators=None):
     formats = {
         str(account.id): request.POST[f"ig_format_{account.id}"]
         for account in accounts
-        if request.POST.get(f"ig_format_{account.id}") in ("story", "feed")
+        if request.POST.get(f"ig_format_{account.id}") in IG_FORMATS
     }
     for acc_id, fmt in formats.items():
         if fmt == "story" and (collaborators or {}).get(acc_id):
@@ -94,12 +94,16 @@ def _instagram_formats(request, workspace, collaborators=None):
     return formats
 
 
+IG_FORMATS = ("feed", "reel", "story")
+
+
 def _set_post_format(platform_post, fmt):
     extra = dict(platform_post.platform_extra or {})
-    if fmt == "story":
-        extra["post_type"] = "story"
-        extra.pop("collaborators", None)  # Instagram rejects collaborators on Stories
-    elif extra.get("post_type") == "story":
+    if fmt in ("reel", "story"):
+        extra["post_type"] = fmt
+        if fmt == "story":
+            extra.pop("collaborators", None)  # Instagram rejects collaborators on Stories
+    elif extra.get("post_type") in ("reel", "story"):
         extra.pop("post_type")
     platform_post.platform_extra = extra
 
@@ -352,6 +356,11 @@ def compose(request, workspace_id, post_id=None):
     account_filter = request.GET.get("account")
     if account_filter and post_id:
         social_accounts = social_accounts.filter(id=account_filter)
+    elif account_filter and not post_id:
+        # New post from a queue slot "+ Novo": preselect that channel.
+        with contextlib.suppress(ValueError, ValidationError):
+            if social_accounts.filter(id=account_filter).exists():
+                selected_account_ids = [account_filter]
 
     # Platform character limits for JS
     char_limits = {
@@ -366,7 +375,8 @@ def compose(request, workspace_id, post_id=None):
 
     for account in social_accounts:
         account.collaborators_csv = ", ".join(platform_extras.get(str(account.id), {}).get("collaborators", []))
-        account.ig_is_story = platform_extras.get(str(account.id), {}).get("post_type") == "story"
+        post_type = platform_extras.get(str(account.id), {}).get("post_type")
+        account.ig_format = post_type if post_type in ("reel", "story") else "feed"
 
     # Workspace defaults
     default_first_comment = workspace.default_first_comment
@@ -1036,8 +1046,9 @@ def preview(request, workspace_id):
                     if len(effective_caption) > char_limit
                     else effective_caption,
                     "needs_title": field_config["needs_title"],
-                    "is_story": account.platform == "instagram"
-                    and request.GET.get(f"ig_format_{account.id}") == "story",
+                    "ig_format": request.GET.get(f"ig_format_{account.id}", "feed")
+                    if account.platform == "instagram"
+                    else "",
                 }
             )
 

@@ -462,7 +462,8 @@ class PublishEngine:
 
         # 4. Fallback based on first media type
         if first_media_type == "video":
-            if platform == "instagram" and platform_extra.get("collaborators"):
+            # Instagram no longer publishes feed videos: a single video is a Reel.
+            if platform == "instagram":
                 return PostType.REEL
             return PostType.VIDEO
         if first_media_type == "image":

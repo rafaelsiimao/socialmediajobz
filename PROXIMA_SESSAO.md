@@ -224,8 +224,59 @@ apenas pela criação deste arquivo.
   Ordem sugerida: (a) página + blocos sem migração (1, 2a, 3 posts/
   comentários, 4, 5, 6, 7); (b) histórico de seguidores; (c) metas de
   publicação; (d) pontuação de comentários. Tudo em português.
+- **Fila no estilo Buffer (implementado localmente):** aba Fila mostra,
+  por dia ("Hoje", "Amanhã", "Sábado, 25 de outubro"), os posts agendados
+  e os horários livres de cada conta (`PostingSlot`) como "+ Novo"; o
+  horário ocupado por um post agendado some. "+ Novo" abre o Composer com
+  `?account=&scheduled_date=&scheduled_time=` (conta pré-selecionada,
+  data/hora no fuso do workspace). "Mais horários" estende de 7 em 7 dias
+  (máx. 28). Horas em 24h. Filtro de canal também filtra os horários.
+  Testes em `tests/test_publish_queue.py`; conferido no navegador.
+- **Futuro: página "Insights" no estilo Buffer** (captura enviada em
+  23/10/2026; só plano). Item novo no menu lateral. Blocos:
+  1. Período: 7 dias / 30 dias / mês até hoje / personalizado; filtros de
+     canal e tag; botão Exportar (CSV simples primeiro; PDF depois).
+  2. "Destaques da semana": cards de ação, ex. "X comentários sem
+     resposta → Responder" (Inbox) e "faltam N posts para a meta → Criar
+     post" (depende das metas de publicação do plano da página Início).
+  3. Resumo vs período anterior: Posts publicados, Total de seguidores
+     (+variação; precisa `FollowerSnapshot`, ver plano do Início), Reações,
+     Comentários, Taxa de engajamento, Visualizações. Fonte:
+     `PlatformPostMetrics` agregado por `published_at` no período. Definir
+     taxa de engajamento = interações ÷ alcance (documentar na tela).
+  4. Top 5 posts com alternância Reações/Comentários: cards com posição,
+     número, rede, data, selo "Story", início da legenda e miniatura;
+     clique abre o modal de prévia+desempenho que já existe.
+  Limites atuais a comunicar na tela: só Instagram (Facebook desativado),
+  só posts publicados pelo sistema até existir a importação do histórico,
+  e Story só tem métricas nas primeiras 24h (IG) — a sincronização a cada
+  3h pode perder parte disso. Ordem sugerida: página + período + resumo +
+  top 5 (sem migração) → exportar CSV → destaques → seguidores/metas.
+- **Composer do Instagram no estilo Buffer** (capturas de 23/10/2026):
+  formato Post / Reel / Story por conta, campos mudam conforme o formato
+  (Post: música, tag de produtos, primeiro comentário, colaboradores;
+  Story: texto, link, música, outros; sem colaboradores). Já existe: Feed/
+  Story, colaboradores escondidos no Story, prévia 9:16, sequência.
+  Falta: opção explícita **Reel** (hoje vídeo vira Reel só com
+  colaboradores) e esconder o primeiro comentário no Story (o campo é
+  global, não por conta). **Stickers/música/link/tag de produto NÃO são
+  publicáveis pela API do Instagram**: o Buffer troca para "Notify Me"
+  (notificação no app móvel deles; a pessoa termina no app do Instagram).
+  Fonte: https://support.buffer.com/article/933-adding-music-stickers-and-other-effects-to-instagram-and-tiktok-posts
+  Aqui não há app móvel: alternativa seria "lembrete de publicação manual"
+  (e-mail/notificação com mídia para baixar e legenda para copiar) —
+  decidir com Rafael antes. Música em Reels pela API de áudio tem catálogo
+  limitado (ver contexto); não prometer músicas em alta.
+- **Reel no Composer (implementado localmente):** formato Post / Reel /
+  Story por conta Instagram (`ig_format_<id>` = feed|reel|story, salvo em
+  `platform_extra.post_type`). Reel aceita colaboradores; exige 1 vídeo
+  (provider rejeita imagem ou mais de 1 mídia). Prévia 9:16 de Reel.
+  Correção: vídeo único no Instagram como "Post" ia como imagem e falhava;
+  agora vira Reel automaticamente (engine `_resolve_post_type`).
+  Stickers ficam fora (API não suporta; ver item do Composer acima).
 - Pendentes: importação do histórico do Instagram, reformulação do Inbox,
-  página Início, correção das métricas do Facebook.
+  página Início, página Insights, lembrete de publicação manual
+  (stickers), correção das métricas do Facebook.
 
 ## Novas funcionalidades planejadas (ordem combinada)
 

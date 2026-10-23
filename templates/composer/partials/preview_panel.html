@@ -60,7 +60,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             </div>
         </div>
 
-        {% elif p.is_story %}
+        {% elif p.ig_format == "story" %}
         {# ─── Instagram Story ─── 9:16 full-bleed, progress bars per media in the sequence #}
         <div class="flex justify-center bg-stone-50 py-3">
             <div class="relative w-full max-w-[240px] bg-black rounded-2xl overflow-hidden select-none" style="aspect-ratio: 9/16;"
@@ -113,6 +113,43 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             {% if media_items|length > 1 %}Sequência de {{ media_items|length }} Stories · toque nas laterais para navegar.{% else %}Story único.{% endif %}
             A legenda não aparece no Story.
         </p>
+
+        {% elif p.ig_format == "reel" %}
+        {# ─── Instagram Reel ─── 9:16 video with caption and actions overlaid #}
+        <div class="flex justify-center bg-stone-50 py-3">
+            <div class="relative w-full max-w-[240px] bg-black rounded-2xl overflow-hidden" style="aspect-ratio: 9/16;">
+                {% with m=media_items.0 %}
+                {% if m and m.is_video %}
+                <video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video>
+                {% elif m %}
+                <img src="{{ m.url }}" class="w-full h-full object-cover opacity-60" alt="">
+                <div class="absolute inset-x-4 top-1/3 text-center text-[11px] font-medium text-white bg-black/60 rounded-lg px-2 py-1.5">Reel precisa de 1 vídeo</div>
+                {% else %}
+                <div class="absolute inset-0 flex items-center justify-center text-[11px] text-white/50 px-6 text-center">Adicione 1 vídeo vertical para o Reel</div>
+                {% endif %}
+                {% endwith %}
+                <div class="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/70 to-transparent pointer-events-none"></div>
+                <!-- Right action column -->
+                <div class="absolute right-2 bottom-16 flex flex-col items-center gap-3 text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/></svg>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z"/></svg>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+                </div>
+                <!-- Account + caption -->
+                <div class="absolute left-3 right-10 bottom-3 text-white">
+                    <div class="flex items-center gap-2 mb-1">
+                        {% if p.account.avatar_url %}
+                        <img src="{{ p.account.avatar_url }}" class="w-6 h-6 rounded-full object-cover border border-white/60" alt="">
+                        {% else %}
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold" style="background: linear-gradient(135deg, #F58529, #DD2A7B, #8134AF);">{{ p.account.account_name|make_list|first|upper }}</div>
+                        {% endif %}
+                        <span class="text-[12px] font-semibold">{{ p.account.account_name }}</span>
+                    </div>
+                    {% if p.caption %}<p class="text-[11px] leading-snug line-clamp-2 break-words">{{ p.truncated_caption }}</p>{% endif %}
+                    <p class="text-[10px] text-white/70 mt-1">♪ Áudio original</p>
+                </div>
+            </div>
+        </div>
 
         {% elif p.account.platform == "instagram" or p.account.platform == "instagram_personal" %}
         {# ─── Instagram ─── square media, account header, action icons #}

@@ -49,6 +49,10 @@ def _is_video_url(url: str) -> bool:
     return urlsplit(url).path.lower().endswith((".mp4", ".mov"))
 
 
+def _is_image_url(url: str) -> bool:
+    return urlsplit(url).path.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp"))
+
+
 def _parse_ig_time(value: str) -> datetime:
     """Parse Graph API timestamps such as ``2026-10-23T16:50:51+0000``."""
     return datetime.fromisoformat(value.replace("+0000", "+00:00"))
@@ -244,6 +248,8 @@ class InstagramProvider(SocialProvider):
                 f"Story aceita de 1 a {MAX_STORY_SEQUENCE} imagens ou vídeos (um Story por mídia).",
                 platform=self.platform_name,
             )
+        if content.post_type == PostType.REEL and (len(content.media_urls) != 1 or _is_image_url(content.media_urls[0])):
+            raise PublishError("Reel aceita exatamente 1 vídeo.", platform=self.platform_name)
         ig_user_id = content.extra.get("ig_user_id") or self._get_ig_user_id(access_token)
 
         if content.post_type == PostType.STORY:
