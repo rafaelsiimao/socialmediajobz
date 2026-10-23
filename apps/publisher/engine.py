@@ -137,7 +137,8 @@ class PublishEngine:
             pp.refresh_from_db()
             if pp.status == PlatformPost.Status.PUBLISHED:
                 comment_text = pp.effective_first_comment
-                if comment_text:
+                # Stories cannot receive comments.
+                if comment_text and (pp.platform_extra or {}).get("post_type") != "story":
                     _post_first_comment_task(str(pp.id), schedule=FIRST_COMMENT_DELAY)
 
     def _publish_platform_post(self, platform_post):

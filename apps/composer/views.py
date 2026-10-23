@@ -75,6 +75,35 @@ def _set_collaborators(platform_post, collaborators):
     platform_post.platform_extra = extra
 
 
+def _instagram_formats(request, workspace, collaborators=None):
+    """Return {account_id: "story" | "feed"} from the per-account format radio.
+
+    Raises ValueError when a Story also has collaborators (Instagram only
+    accepts collaborators on feed photos, carousels and Reels).
+    """
+    selected = [value.strip() for value in request.POST.get("selected_accounts", "").split(",") if value.strip()]
+    accounts = SocialAccount.objects.filter(workspace=workspace, platform="instagram", id__in=selected)
+    formats = {
+        str(account.id): request.POST[f"ig_format_{account.id}"]
+        for account in accounts
+        if request.POST.get(f"ig_format_{account.id}") in ("story", "feed")
+    }
+    for acc_id, fmt in formats.items():
+        if fmt == "story" and (collaborators or {}).get(acc_id):
+            raise ValueError("Stories não aceitam colaboradores. Remova os colaboradores ou publique no feed.")
+    return formats
+
+
+def _set_post_format(platform_post, fmt):
+    extra = dict(platform_post.platform_extra or {})
+    if fmt == "story":
+        extra["post_type"] = "story"
+        extra.pop("collaborators", None)  # Instagram rejects collaborators on Stories
+    elif extra.get("post_type") == "story":
+        extra.pop("post_type")
+    platform_post.platform_extra = extra
+
+
 def _sync_platform_posts(request, post, workspace, initial_status=None):
     """Sync platform post selections from form data.
 
@@ -135,6 +164,9 @@ def _sync_platform_posts(request, post, workspace, initial_status=None):
         collaborators = getattr(request, "instagram_collaborators", {})
         if account.platform == "instagram" and acc_id in collaborators:
             _set_collaborators(pp, collaborators[acc_id])
+        formats = getattr(request, "instagram_formats", {})
+        if account.platform == "instagram" and acc_id in formats:
+            _set_post_format(pp, formats[acc_id])
         pp.save()
 
 
@@ -334,6 +366,7 @@ def compose(request, workspace_id, post_id=None):
 
     for account in social_accounts:
         account.collaborators_csv = ", ".join(platform_extras.get(str(account.id), {}).get("collaborators", []))
+        account.ig_is_story = platform_extras.get(str(account.id), {}).get("post_type") == "story"
 
     # Workspace defaults
     default_first_comment = workspace.default_first_comment
@@ -609,6 +642,10 @@ def save_post(request, workspace_id, post_id=None):
         request.instagram_collaborators = _instagram_collaborators(request, workspace)
     except ValueError as exc:
         return JsonResponse({"errors": {"collaborators": [str(exc)]}}, status=400)
+    try:
+        request.instagram_formats = _instagram_formats(request, workspace, request.instagram_collaborators)
+    except ValueError as exc:
+        return JsonResponse({"errors": {"ig_format": [str(exc)]}}, status=400)
 
     post = form.save(commit=False)
     post.workspace = workspace
@@ -894,6 +931,10 @@ def autosave(request, workspace_id, post_id=None):
         collaborators = _instagram_collaborators(request, workspace)
     except ValueError as exc:
         return JsonResponse({"errors": {"collaborators": [str(exc)]}}, status=400)
+    try:
+        formats = _instagram_formats(request, workspace, collaborators)
+    except ValueError as exc:
+        return JsonResponse({"errors": {"ig_format": [str(exc)]}}, status=400)
 
     is_new = False
     if post_id:
@@ -942,6 +983,9 @@ def autosave(request, workspace_id, post_id=None):
         )
         if acc_id in collaborators:
             _set_collaborators(platform_post, collaborators[acc_id])
+        if acc_id in formats:
+            _set_post_format(platform_post, formats[acc_id])
+        if acc_id in collaborators or acc_id in formats:
             platform_post.save(update_fields=["platform_extra", "updated_at"])
 
     return HttpResponse(

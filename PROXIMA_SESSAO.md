@@ -168,8 +168,16 @@ apenas pela criação deste arquivo.
   `timestamp` da mídia no `extra` (hoje guarda `media_id`, `permalink`,
   `media_caption`). "Respondido" = tem `InboxReply` ou status resolvido.
   Fora do escopo inicial: Menções (webhooks) e comentários do Facebook.
-- Pendentes: Stories, importação do histórico do Instagram, reformulação
-  do Inbox, correção das métricas do Facebook.
+- **Stories no Instagram (implementado localmente):** seletor "Formato:
+  Feed / Story" por conta Instagram no Composer (`ig_format_<id>`), salvo
+  como `platform_extra.post_type = "story"` (save_post e autosave). Story
+  remove colaboradores e desativa o campo; Story + colaboradores → 400.
+  Provider: Story sem legenda, exatamente 1 mídia, detecção de vídeo
+  ignorando query string de URL assinada (vale também para carrossel).
+  Primeiro comentário não é enviado em Story. Sem publicação real testada.
+  "Compartilhar post do feed nos Stories" (cartão nativo) continua fora.
+- Pendentes: importação do histórico do Instagram, reformulação do Inbox,
+  correção das métricas do Facebook.
 
 ## Novas funcionalidades planejadas (ordem combinada)
 

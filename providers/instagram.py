@@ -10,7 +10,7 @@ import logging
 import re
 import time
 from datetime import datetime
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from .base import SocialProvider
 from .exceptions import APIError, OAuthError, PublishError
@@ -39,6 +39,11 @@ TOKEN_URL = f"{BASE_URL}/oauth/access_token"
 # Polling settings for container status checks
 CONTAINER_POLL_INTERVAL = 2  # seconds
 CONTAINER_POLL_MAX_ATTEMPTS = 60
+
+
+def _is_video_url(url: str) -> bool:
+    """Detect video by path extension, ignoring signed-URL query strings."""
+    return urlsplit(url).path.lower().endswith((".mp4", ".mov"))
 
 
 def _parse_ig_time(value: str) -> datetime:
@@ -231,6 +236,8 @@ class InstagramProvider(SocialProvider):
             raise PublishError(
                 "Colaboração está disponível apenas para fotos, carrosséis e Reels.", platform=self.platform_name
             )
+        if content.post_type == PostType.STORY and len(content.media_urls) != 1:
+            raise PublishError("Story aceita exatamente 1 imagem ou 1 vídeo.", platform=self.platform_name)
         ig_user_id = content.extra.get("ig_user_id") or self._get_ig_user_id(access_token)
 
         if content.post_type == PostType.CAROUSEL:
@@ -243,7 +250,8 @@ class InstagramProvider(SocialProvider):
         """Publish a single image, reel, or story."""
         payload: dict = {}
 
-        if content.text:
+        # Stories have no caption field in the Graph API.
+        if content.text and content.post_type != PostType.STORY:
             payload["caption"] = content.text
         if collaborators:
             payload["collaborators"] = collaborators
@@ -252,7 +260,7 @@ class InstagramProvider(SocialProvider):
             payload["media_type"] = "REELS"
             payload["video_url"] = content.media_urls[0]
         elif content.post_type == PostType.STORY:
-            if content.media_urls and content.media_urls[0].endswith((".mp4", ".mov")):
+            if _is_video_url(content.media_urls[0]):
                 payload["media_type"] = "STORIES"
                 payload["video_url"] = content.media_urls[0]
             else:
@@ -278,7 +286,7 @@ class InstagramProvider(SocialProvider):
         child_ids: list[str] = []
 
         for url in content.media_urls:
-            is_video = url.lower().endswith((".mp4", ".mov"))
+            is_video = _is_video_url(url)
             child_payload: dict = {
                 "is_carousel_item": True,
             }
