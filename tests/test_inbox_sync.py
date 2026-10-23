@@ -199,3 +199,33 @@ def test_instagram_requests_messaging_scopes():
     scopes = InstagramProvider({}).required_scopes
     assert "instagram_manage_messages" in scopes
     assert "pages_manage_metadata" in scopes
+
+
+@pytest.mark.django_db
+def test_inbox_feed_lists_messages_without_flash_banners(client, org_owner, organization):
+    from django.urls import reverse
+    from django.utils import timezone
+
+    from apps.members.models import WorkspaceMembership
+
+    workspace = Workspace.objects.create(organization=organization, name="Inbox feed")
+    WorkspaceMembership.objects.create(
+        user=org_owner, workspace=workspace, workspace_role=WorkspaceMembership.WorkspaceRole.OWNER
+    )
+    account = SocialAccount.objects.create(
+        workspace=workspace, platform="instagram", account_platform_id="ig-1", account_name="Jobz"
+    )
+    message = InboxMessage.objects.create(
+        workspace=workspace,
+        social_account=account,
+        platform_message_id="c-1",
+        sender_name="fan",
+        body="Adorei o post",
+        message_type="comment",
+        received_at=timezone.now(),
+    )
+    client.force_login(org_owner)
+    body = client.get(reverse("inbox:feed", kwargs={"workspace_id": workspace.id})).content.decode()
+
+    assert f'id="msg-{message.id}"' in body
+    assert str(message) not in body
