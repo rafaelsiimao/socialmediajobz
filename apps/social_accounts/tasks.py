@@ -55,6 +55,10 @@ def check_social_account_health(account_id: str):
         except MastodonAppRegistration.DoesNotExist:
             pass
 
+    # Instagram via Facebook Login: address this account, not the first IG found on the token.
+    if account.platform == "instagram":
+        credentials = {**credentials, "ig_user_id": account.account_platform_id}
+
     try:
         provider = get_provider(account.platform, credentials)
     except ValueError:
@@ -82,6 +86,9 @@ def check_social_account_health(account_id: str):
     try:
         profile = provider.get_profile(account.oauth_access_token)
         account.follower_count = profile.follower_count
+        # Meta CDN picture URLs expire after a few days: keep the stored one fresh.
+        if profile.avatar_url and (not profile.platform_id or str(profile.platform_id) == account.account_platform_id):
+            account.avatar_url = profile.avatar_url
         FollowerSnapshot.objects.update_or_create(
             social_account=account,
             date=timezone.localdate(),
@@ -102,6 +109,7 @@ def check_social_account_health(account_id: str):
             "oauth_refresh_token",
             "token_expires_at",
             "follower_count",
+            "avatar_url",
             "connection_status",
             "last_error",
             "last_health_check_at",
