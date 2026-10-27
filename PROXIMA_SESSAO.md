@@ -3,6 +3,42 @@
 Atualizado em 23/10/2026. Rafael pediu este arquivo para continuar em outra
 sessão sem recomeçar, pois está com pouco uso disponível.
 
+## Revisão geral (27/10/2026) — o que falta para tudo funcionar
+
+Corrigir no código:
+1. Instagram via Facebook (conector `instagram`): conexão não deixa escolher a
+   conta e a publicação usa o PRIMEIRO Instagram do login (engine não injeta
+   `ig_user_id`). Risco de post na conta errada. Prioridade máxima.
+   → CORRIGIDO localmente (27/10): engine injeta `ig_user_id` da conta;
+   conexão lista os Instagram ligados às Páginas para escolher
+   (`InstagramProvider.get_user_pages`), guardando o token do usuário com
+   validade. Commit/deploy só depois do post agendado das 17h sair.
+
+Operação (Rafael):
+2. Implantar web + worker na versão atual (migrações composer/0017 e
+   social_accounts/0005).
+3. Instagram (Personal): adicionar `instagram_business_manage_insights` no
+   caso de uso API do Instagram; testadores do Instagram; conectar.
+4. Instagram via Facebook: reconectar para receber os scopes novos (DMs) e
+   ativar "Permitir acesso às mensagens" no app do Instagram.
+5. Token do Instagram via Facebook dura ~60 dias sem renovação automática
+   (não há refresh token): reconectar quando o canal ficar vermelho.
+6. Worker precisa rodar `process_tasks` (publicação 15s, Inbox 5 min,
+   métricas 3h, saúde/fotos/seguidores 6h, importação IG diária).
+
+Pendências conhecidas (não bloqueiam):
+7. Métricas do Facebook desativadas (erro `shares`).
+8. Threads: formulário da Meta não salva o redirect. Dica do README original:
+   cadastrar `/social-accounts/callback/threads/` em Facebook Login →
+   Configurações → URIs de redirecionamento do OAuth válidos.
+9. LinkedIn Company aguardando aprovação da Community Management API.
+10. Projeto original (github.com/brightbeanxyz/brightbean-studio) tem
+    correções novas (proteção do worker, DMs do Instagram via Facebook,
+    métricas). Avaliar trazer seletivamente; merge completo conflita.
+
+Funcionalidades planejadas: página Início, Inbox estilo Buffer, lembrete de
+publicação manual (stickers), filtro por tags e PDF nos Insights.
+
 ## Ponto exato em que paramos
 
 Estamos preparando a análise do aplicativo da Meta para permitir que CLIENTES

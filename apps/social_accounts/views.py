@@ -278,6 +278,7 @@ def oauth_callback(request, platform):
                     "user_tokens": {
                         "access_token": tokens.access_token,
                         "refresh_token": tokens.refresh_token,
+                        "expires_in": tokens.expires_in,
                     },
                     "pages": pages,
                 }
@@ -392,9 +393,10 @@ def select_account(request):
                 workspace_id=workspace_id,
                 platform=platform,
                 profile=profile,
-                access_token=page.get("access_token", user_tokens["access_token"]),
+                access_token=page.get("access_token") or user_tokens["access_token"],
                 refresh_token=user_tokens.get("refresh_token"),
-                expires_in=None,
+                # Instagram stores the user token, which expires; Page tokens don't.
+                expires_in=user_tokens.get("expires_in") if platform == "instagram" else None,
             )
             connected.append(page["name"])
 

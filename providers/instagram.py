@@ -689,6 +689,39 @@ class InstagramProvider(SocialProvider):
     # Helpers
     # ------------------------------------------------------------------
 
+    def get_user_pages(self, access_token: str) -> list[dict]:
+        """List the Instagram professional accounts linked to the user's Pages.
+
+        Used by the connection flow so the user picks which Instagram account
+        to connect (the token can manage several). Each entry carries the IG
+        account data; no Page token, since we store the user token.
+        """
+        resp = self._request(
+            "GET",
+            f"{BASE_URL}/me/accounts",
+            access_token=access_token,
+            params={
+                "fields": "id,name,instagram_business_account{id,username,name,profile_picture_url,followers_count}",
+                "limit": 100,
+            },
+        )
+        accounts: list[dict] = []
+        for page in resp.json().get("data", []):
+            ig = page.get("instagram_business_account")
+            if not ig:
+                continue
+            accounts.append(
+                {
+                    "id": ig["id"],
+                    "name": ig.get("name") or ig.get("username", ""),
+                    "handle": ig.get("username"),
+                    "category": f"Instagram @{ig.get('username', '')} · Página {page.get('name', '')}",
+                    "picture": ig.get("profile_picture_url"),
+                    "followers_count": ig.get("followers_count", 0),
+                }
+            )
+        return accounts
+
     def _get_ig_user_id(self, access_token: str) -> str:
         """Resolve the Instagram Business Account ID from the connected
         Facebook Page.

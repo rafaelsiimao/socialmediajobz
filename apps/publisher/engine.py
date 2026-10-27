@@ -339,6 +339,12 @@ class PublishEngine:
             if platform == "facebook" and "page_id" not in extra:
                 extra["page_id"] = account.account_platform_id
 
+            # Instagram via Facebook Login: publish to THIS account. The token can
+            # manage several Instagram accounts; without the ID the provider would
+            # pick the first one found.
+            if platform == "instagram":
+                extra["ig_user_id"] = account.account_platform_id
+
             # Inject author and page_id for LinkedIn Company Page
             if platform == "linkedin_company":
                 if "author" not in extra:
