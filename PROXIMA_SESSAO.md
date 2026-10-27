@@ -36,6 +36,18 @@ Pendências conhecidas (não bloqueiam):
     correções novas (proteção do worker, DMs do Instagram via Facebook,
     métricas). Avaliar trazer seletivamente; merge completo conflita.
 
+E-mails em pt-BR com identidade Jobz (implementado localmente, 27/10):
+modelo base `templates/email/base.html` (logo preto em PNG com URL absoluta,
+botão #1E81FE, rodapé "Jobz Social Media"); notificação, resumo diário,
+convite, portal do cliente e conexão de contas traduzidos; assuntos e
+títulos de notificação (aprovações, Inbox, onboarding) em português;
+e-mails de login via `AccountAdapter.send_mail` com pt-BR e HTML próprio
+(confirmação e redefinição de senha), prefixo `[Jobz Social Media]`.
+Prévia só para administradores em `/notifications/email-preview/`.
+Rafael: definir no EasyPanel `DEFAULT_FROM_EMAIL="Jobz Social Media
+<endereço>"`. Ainda em inglês: telas de conexão do cliente (onboarding)
+e portal do cliente.
+
 Funcionalidades planejadas: página Início, Inbox estilo Buffer, lembrete de
 publicação manual (stickers), filtro por tags e PDF nos Insights.
 

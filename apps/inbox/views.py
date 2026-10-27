@@ -33,6 +33,7 @@ from .models import (
     InboxSLAConfig,
     InternalNote,
     SavedReply,
+    message_type_label,
 )
 
 logger = logging.getLogger(__name__)
@@ -322,8 +323,8 @@ def assign_message(request, workspace_id, message_id):
         notify(
             user=message.assigned_to,
             event_type=EventType.NEW_INBOX_MESSAGE,
-            title=f"You were assigned a {message.get_message_type_display()}",
-            body=f"From {message.sender_name}: {message.body[:100]}",
+            title=f"Atribuído a você: {message_type_label(message)} de {message.sender_name}",
+            body=f"De {message.sender_name}: {message.body[:100]}",
             data={
                 "message_id": str(message.id),
                 "workspace_id": str(workspace.id),

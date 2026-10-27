@@ -1,12 +1,14 @@
-Daily Notification Digest - {{ date|date:"N j, Y" }}
-{{ notifications|length }} notification{{ notifications|length|pluralize }}
+Resumo diário - {{ date|date:"d/m/Y" }}
+{{ notifications|length }} notificaç{{ notifications|length|pluralize:"ão,ões" }}
 
 {% for n in notifications %}
-- {{ n.title }}{% if n.body %}: {{ n.body|truncatewords:20 }}{% endif %} ({{ n.created_at|timesince }} ago)
+- {{ n.title }}{% if n.body %}: {{ n.body|truncatewords:20 }}{% endif %} ({{ n.created_at|date:"d/m" }})
 {% endfor %}
 
-View all: {{ app_url }}/notifications/
+Ver todas: {{ app_url }}/notifications/
 
 ---
-You're receiving this daily digest.
-Manage preferences: {{ app_url }}/notifications/preferences/
+Você recebe este resumo diário por causa das suas preferências de notificação.
+Gerenciar preferências: {{ app_url }}/notifications/preferences/
+
+Jobz Social Media

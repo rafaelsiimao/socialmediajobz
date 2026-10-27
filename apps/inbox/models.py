@@ -123,6 +123,33 @@ class InboxMessage(models.Model):
         return self.social_account.platform
 
 
+# Portuguese labels used in notification titles/e-mails.
+MESSAGE_TYPE_LABELS_PT = {
+    "comment": "comentário",
+    "mention": "menção",
+    "dm": "mensagem direta",
+    "review": "avaliação",
+}
+
+
+# "Novo comentário" / "Nova mensagem direta": gender agreement for new-message titles.
+NEW_MESSAGE_LABELS_PT = {
+    "comment": "Novo comentário",
+    "mention": "Nova menção",
+    "dm": "Nova mensagem direta",
+    "review": "Nova avaliação",
+}
+
+
+def message_type_label(message):
+    return MESSAGE_TYPE_LABELS_PT.get(message.message_type, message.message_type)
+
+
+def new_message_title(message):
+    label = NEW_MESSAGE_LABELS_PT.get(message.message_type, "Nova mensagem")
+    return f"{label} de {message.sender_name}"
+
+
 class InboxReply(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     inbox_message = models.ForeignKey(

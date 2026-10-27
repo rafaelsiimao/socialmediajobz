@@ -12,7 +12,7 @@ from apps.notifications.models import EventType
 from apps.social_accounts.models import SocialAccount
 from providers import get_provider
 
-from .models import InboxMessage, InboxSLAConfig
+from .models import InboxMessage, InboxSLAConfig, message_type_label, new_message_title
 from .sentiment import analyze_sentiment
 
 logger = logging.getLogger(__name__)
@@ -133,7 +133,7 @@ class InboxSyncEngine:
             notify(
                 user=user,
                 event_type=EventType.NEW_INBOX_MESSAGE,
-                title=f"New {message.get_message_type_display()} from {message.sender_name}",
+                title=new_message_title(message),
                 body=message.body[:200],
                 data={
                     "message_id": str(message.id),
@@ -175,8 +175,8 @@ class InboxSyncEngine:
             notify(
                 user=user,
                 event_type=EventType.INBOX_SLA_OVERDUE,
-                title=f"SLA overdue: {message.get_message_type_display()} from {message.sender_name}",
-                body=f"Response target of {config.target_response_minutes} minutes exceeded.",
+                title=f"Prazo de resposta vencido: {message_type_label(message)} de {message.sender_name}",
+                body=f"A meta de resposta de {config.target_response_minutes} minutos foi ultrapassada.",
                 data={
                     "message_id": str(message.id),
                     "workspace_id": str(message.workspace_id),

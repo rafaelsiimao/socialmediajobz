@@ -170,8 +170,8 @@ def _notify_mentions(mentions, post, author, workspace, body):
             notify(
                 user=target_user,
                 event_type=EventType.COMMENT_MENTION,
-                title=f"{author.display_name} mentioned you",
-                body=f'In a comment on a post: "{body[:100]}"',
+                title=f"{author.display_name} mencionou você",
+                body=f'Em um comentário de uma publicação: "{body[:100]}"',
                 data={
                     "post_id": str(post.id),
                     "workspace_id": str(workspace.id),

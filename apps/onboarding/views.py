@@ -170,7 +170,7 @@ def send_link_email(request, workspace_id, link_id):
     html_content = render_to_string("onboarding/email/connection_link.html", context)
 
     msg = EmailMultiAlternatives(
-        subject=f"{org.name} - Connect your social accounts",
+        subject=f"{org.name} - Conecte suas redes sociais",
         body=text_content,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@localhost"),
         to=[email],
@@ -471,8 +471,8 @@ def connection_done(request, token):
         notify(
             user=membership.user,
             event_type=EventType.CLIENT_CONNECTED_ACCOUNTS,
-            title="Client connected accounts",
-            body=f"{connected_count} account(s) connected to {link.workspace.name}: {account_names}",
+            title="Cliente conectou as contas",
+            body=f"{connected_count} conta(s) conectada(s) em {link.workspace.name}: {account_names}",
             data={
                 "workspace_id": str(link.workspace_id),
                 "connection_link_id": str(link.id),

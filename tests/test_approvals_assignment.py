@@ -215,4 +215,4 @@ def test_notification_email_template_contains_action_url(users_and_memberships):
         {"notification": notif, "user": reviewer1, "app_url": "https://socialmedia-web.hqzarv.easypanel.host"},
     )
     assert "https://socialmedia-web.hqzarv.easypanel.host/workspace/test/approvals/" in rendered_html
-    assert "View Details" in rendered_html
+    assert "Ver detalhes" in rendered_html

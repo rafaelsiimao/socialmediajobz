@@ -1,0 +1,6 @@
+{% autoescape off %}Olá! Esta é uma mensagem do Jobz Social Media.
+
+{% block content %}{% endblock content %}
+
+Obrigado por usar o Jobz Social Media.
+{% endautoescape %}

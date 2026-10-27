@@ -1,9 +1,13 @@
-Hi there,
+Olá,
 
-{{ invited_by.display_name }} has invited you to join {{ org_name }} as a team member on Brightbean.
+{{ invited_by.display_name }} convidou você para fazer parte da equipe de {{ org_name }} no Jobz Social Media.
 
-Accept the invitation by visiting the link below:
+Aceite o convite pelo link abaixo:
 
 {{ accept_url }}
 
-This invitation expires in 7 days. If it expires, ask your team admin for a new one.
+Este convite expira em 7 dias. Se expirar, peça um novo convite ao administrador da sua equipe.
+
+Se você não esperava este convite, pode ignorar este e-mail.
+
+Jobz Social Media

@@ -1,9 +1,12 @@
-Hi {{ client_user.display_name }},
+Olá, {{ client_user.display_name }}!
 
-{{ created_by.display_name }} has shared content for your review in {{ workspace.name }}.
+{{ created_by.display_name }} enviou conteúdos de {{ workspace.name }} para a sua revisão.
 
-Click the link below to access your portal and approve or provide feedback on scheduled posts:
+Acesse o portal pelo link abaixo para aprovar as publicações ou enviar seus comentários:
 
 {{ magic_url }}
 
-This link is valid for 30 days. If it expires, ask your account manager for a new one.
+Este link é válido por 30 dias. Se expirar, peça um novo link ao seu responsável na Jobz.
+Este link é pessoal. Não compartilhe com outras pessoas.
+
+Jobz Social Media

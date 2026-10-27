@@ -2,8 +2,10 @@
 
 {{ notification.body }}
 
-{% if notification.data.action_url %}View details: {{ notification.data.action_url }}{% endif %}
+{% if notification.data.action_url %}Ver detalhes: {{ notification.data.action_url }}{% endif %}
 
 ---
-You received this because of your notification settings.
-Manage preferences: {{ app_url }}/notifications/preferences/
+Você recebeu este e-mail por causa das suas preferências de notificação.
+Gerenciar preferências: {{ app_url }}/notifications/preferences/
+
+Jobz Social Media

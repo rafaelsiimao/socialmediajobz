@@ -1,6 +1,18 @@
+from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+from django.utils import translation
 
 from apps.accounts.models import OAuthConnection
+
+
+class AccountAdapter(DefaultAccountAdapter):
+    def send_mail(self, template_prefix, email, context):
+        """Send login e-mails (confirmation, password reset...) in Brazilian Portuguese.
+
+        Only these e-mails switch language; the rest of the site keeps its settings.
+        """
+        with translation.override("pt-br"):
+            return super().send_mail(template_prefix, email, context)
 
 
 class SocialAccountAdapter(DefaultSocialAccountAdapter):

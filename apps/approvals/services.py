@@ -119,8 +119,8 @@ def submit_for_review(target, user, workspace, reviewer=None):
             notify(
                 user=target_reviewer,
                 event_type=EventType.POST_SUBMITTED,
-                title="Post submitted for review",
-                body=f'{user.display_name} submitted a post for your review: "{post.caption_snippet}"',
+                title="Publicação enviada para revisão",
+                body=f'{user.display_name} enviou uma publicação para a sua revisão: "{post.caption_snippet}"',
                 data={
                     "post_id": str(post.id),
                     "workspace_id": str(workspace.id),
@@ -135,8 +135,8 @@ def submit_for_review(target, user, workspace, reviewer=None):
                 notify(
                     user=membership.user,
                     event_type=EventType.POST_SUBMITTED,
-                    title="Post submitted for review",
-                    body=f'{user.display_name} submitted a post for your review: "{post.caption_snippet}"',
+                    title="Publicação enviada para revisão",
+                    body=f'{user.display_name} enviou uma publicação para a sua revisão: "{post.caption_snippet}"',
                     data={
                         "post_id": str(post.id),
                         "workspace_id": str(workspace.id),
@@ -198,8 +198,8 @@ def approve_post(target, user, workspace, comment=""):
         notify(
             user=post.author,
             event_type=EventType.POST_APPROVED,
-            title="Post approved",
-            body=f'Your post "{post.caption_snippet}" was approved by {user.display_name}.',
+            title="Publicação aprovada",
+            body=f'Sua publicação "{post.caption_snippet}" foi aprovada por {user.display_name}.',
             data={
                 "post_id": str(post.id),
                 "workspace_id": str(workspace.id),
@@ -234,8 +234,8 @@ def request_changes(target, user, workspace, comment):
         notify(
             user=post.author,
             event_type=EventType.POST_CHANGES_REQUESTED,
-            title="Changes requested on your post",
-            body=f'{user.display_name} requested changes: "{comment[:100]}"',
+            title="Alterações solicitadas na sua publicação",
+            body=f'{user.display_name} pediu alterações: "{comment[:100]}"',
             data={
                 "post_id": str(post.id),
                 "workspace_id": str(workspace.id),
@@ -270,8 +270,8 @@ def reject_post(target, user, workspace, comment):
         notify(
             user=post.author,
             event_type=EventType.POST_REJECTED,
-            title="Post rejected",
-            body=f'{user.display_name} rejected your post: "{comment[:100]}"',
+            title="Publicação rejeitada",
+            body=f'{user.display_name} rejeitou sua publicação: "{comment[:100]}"',
             data={
                 "post_id": str(post.id),
                 "workspace_id": str(workspace.id),
@@ -319,8 +319,8 @@ def resubmit_post(target, user, workspace, reviewer=None):
             notify(
                 user=target_reviewer,
                 event_type=EventType.POST_SUBMITTED,
-                title="Post resubmitted for review",
-                body=f'{user.display_name} resubmitted a post: "{post.caption_snippet}"',
+                title="Publicação reenviada para revisão",
+                body=f'{user.display_name} reenviou uma publicação: "{post.caption_snippet}"',
                 data={
                     "post_id": str(post.id),
                     "workspace_id": str(workspace.id),
@@ -335,8 +335,8 @@ def resubmit_post(target, user, workspace, reviewer=None):
                 notify(
                     user=membership.user,
                     event_type=EventType.POST_SUBMITTED,
-                    title="Post resubmitted for review",
-                    body=f'{user.display_name} resubmitted a post: "{post.caption_snippet}"',
+                    title="Publicação reenviada para revisão",
+                    body=f'{user.display_name} reenviou uma publicação: "{post.caption_snippet}"',
                     data={
                         "post_id": str(post.id),
                         "workspace_id": str(workspace.id),
@@ -399,8 +399,8 @@ def _notify_clients(post, workspace):
         notify(
             user=membership.user,
             event_type=EventType.CLIENT_APPROVAL_REQUESTED,
-            title="Posts ready for your review",
-            body=f"A post in {workspace.name} is waiting for your approval.",
+            title="Publicações prontas para sua revisão",
+            body=f"Uma publicação em {workspace.name} está aguardando sua aprovação.",
             data={
                 "post_id": str(post.id),
                 "workspace_id": str(workspace.id),

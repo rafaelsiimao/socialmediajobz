@@ -66,7 +66,7 @@ def generate_magic_link(workspace, client_user, created_by):
         "app_url": app_url,
     }
 
-    subject = f"{workspace.name} - Posts ready for your review"
+    subject = f"{workspace.name} - Publicações prontas para sua revisão"
     text_content = render_to_string("client_portal/email/magic_link.txt", context)
     html_content = render_to_string("client_portal/email/magic_link.html", context)
 
