@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import threads_callbacks, views
 
 app_name = "social_accounts"
 
@@ -26,6 +26,10 @@ urlpatterns = [
         views.connect_mastodon,
         name="connect_mastodon",
     ),
+    # Threads app settings: uninstall / delete-data callbacks (signed by Meta)
+    path("threads/uninstall/", threads_callbacks.threads_uninstall, name="threads_uninstall"),
+    path("threads/delete/", threads_callbacks.threads_delete, name="threads_delete"),
+    path("threads/delete/status/", threads_callbacks.threads_delete_status, name="threads_delete_status"),
     # OAuth callback (not workspace-scoped - platform redirects here)
     path(
         "callback/<str:platform>/",

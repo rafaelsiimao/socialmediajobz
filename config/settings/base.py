@@ -268,6 +268,9 @@ CSP_FORM_ACTION = (
     # Instagram Login (Instagram Personal connector) redirects through both hosts.
     "https://api.instagram.com",
     "https://www.instagram.com",
+    # Threads OAuth
+    "https://threads.net",
+    "https://www.threads.net",
 )
 
 # Media Library
@@ -301,6 +304,11 @@ _GOOGLE_CREDENTIALS = {
     "client_id": env("PLATFORM_GOOGLE_CLIENT_ID", default=""),
     "client_secret": env("PLATFORM_GOOGLE_CLIENT_SECRET", default=""),
 }
+# Threads has its own app ID/secret (Threads use case in the Meta app), not the Facebook ones.
+_THREADS_CREDENTIALS = {
+    "app_id": env("PLATFORM_THREADS_APP_ID", default=""),
+    "app_secret": env("PLATFORM_THREADS_APP_SECRET", default=""),
+}
 _INSTAGRAM_PERSONAL_CREDENTIALS = {
     "app_id": env("PLATFORM_INSTAGRAM_APP_ID", default=""),
     "app_secret": env("PLATFORM_INSTAGRAM_APP_SECRET", default=""),
@@ -315,10 +323,10 @@ _LINKEDIN_COMPANY_CREDENTIALS = {
 }
 
 PLATFORM_CREDENTIALS_FROM_ENV = {
-    # Meta platforms - Facebook, Instagram, and Threads share the same app
+    # Meta platforms - Facebook and Instagram share the same app; Threads has its own app ID
     "facebook": _META_CREDENTIALS,
     "instagram": _META_CREDENTIALS,
-    "threads": _META_CREDENTIALS,
+    "threads": _THREADS_CREDENTIALS,
     # Instagram (Personal) - uses Instagram Login with separate Instagram App credentials
     "instagram_personal": _INSTAGRAM_PERSONAL_CREDENTIALS,
     # LinkedIn - personal and company page variants

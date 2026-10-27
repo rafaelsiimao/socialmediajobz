@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import time
 from urllib.parse import urlencode
 
 from .base import SocialProvider
 from .exceptions import OAuthError, PublishError
+from .instagram import _is_video_url
 from .types import (
     AccountProfile,
     AuthType,
@@ -25,6 +27,10 @@ logger = logging.getLogger(__name__)
 AUTH_URL = "https://threads.net/oauth/authorize"
 TOKEN_URL = "https://graph.threads.net/oauth/access_token"
 API_BASE = "https://graph.threads.net/v1.0"
+
+# Media containers (videos especially) must finish processing before publishing.
+CONTAINER_POLL_INTERVAL = 3  # seconds
+CONTAINER_POLL_MAX_ATTEMPTS = 60  # ~3 minutes max
 
 
 class ThreadsProvider(SocialProvider):
@@ -258,6 +264,7 @@ class ThreadsProvider(SocialProvider):
                 platform=self.platform_name,
                 raw_response=create_body,
             )
+        self._wait_for_container(access_token, creation_id)
 
         # Step 2: Publish the container
         publish_resp = self._request(
@@ -284,9 +291,7 @@ class ThreadsProvider(SocialProvider):
         children_ids: list[str] = []
 
         for url in content.media_urls:
-            # Determine media type by extension heuristic
-            lower_url = url.lower()
-            if any(lower_url.endswith(ext) for ext in (".mp4", ".mov")):
+            if _is_video_url(url):
                 media_type = "VIDEO"
                 key = "video_url"
             else:
@@ -311,6 +316,7 @@ class ThreadsProvider(SocialProvider):
                     platform=self.platform_name,
                     raw_response=item_body,
                 )
+            self._wait_for_container(access_token, item_id)
             children_ids.append(item_id)
 
         # Step 2: Create carousel container
@@ -332,6 +338,7 @@ class ThreadsProvider(SocialProvider):
                 platform=self.platform_name,
                 raw_response=carousel_body,
             )
+        self._wait_for_container(access_token, creation_id)
 
         # Step 3: Publish
         publish_resp = self._request(
@@ -346,6 +353,27 @@ class ThreadsProvider(SocialProvider):
             platform_post_id=thread_id,
             extra=publish_body,
         )
+
+    def _wait_for_container(self, access_token: str, container_id: str) -> None:
+        """Poll the container until it is ready to publish (status FINISHED)."""
+        for _ in range(CONTAINER_POLL_MAX_ATTEMPTS):
+            body = self._request(
+                "GET",
+                f"{API_BASE}/{container_id}",
+                access_token=access_token,
+                params={"fields": "status,error_message"},
+            ).json()
+            status = body.get("status", "")
+            if status in ("FINISHED", "PUBLISHED"):
+                return
+            if status in ("ERROR", "EXPIRED"):
+                raise PublishError(
+                    f"Threads container failed: {body.get('error_message') or status}",
+                    platform=self.platform_name,
+                    raw_response=body,
+                )
+            time.sleep(CONTAINER_POLL_INTERVAL)
+        raise PublishError("Threads container processing timed out", platform=self.platform_name)
 
     # ------------------------------------------------------------------
     # Comments (replies)

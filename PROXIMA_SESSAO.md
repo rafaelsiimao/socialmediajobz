@@ -335,6 +335,14 @@ apenas pela criação deste arquivo.
   métricas, importação, Inbox, engine). Novo scope
   `instagram_business_manage_insights`: adicionar em Permissões e recursos
   do caso de uso "API do Instagram" no painel Meta.
+- **Threads (implementado localmente):** credenciais próprias
+  `PLATFORM_THREADS_APP_ID/SECRET` (antes usava as do Facebook, errado);
+  CSP libera threads.net; espera o contêiner (vídeo) antes de publicar;
+  vídeo em carrossel com URL assinada; métricas do Threads ativadas.
+  Callbacks exigidos pelo painel: `/social-accounts/threads/uninstall/` e
+  `/social-accounts/threads/delete/` (validam signed_request, apagam tokens
+  e desconectam a conta; não apagam posts). Redirect:
+  `/social-accounts/callback/threads/`. Sem teste com conta real.
 - Pendentes: reformulação do Inbox,
   página Início, lembrete de publicação manual
   (stickers), correção das métricas do Facebook.
