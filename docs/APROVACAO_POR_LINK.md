@@ -46,7 +46,9 @@ seguindo o fluxo existente; sem data, a publicação fica aprovada.
   copiar link independentemente do envio; a decisão não depende do sucesso do SMTP.
 - Token aleatório de 48 bytes; apenas SHA-256 no registro ApprovalLink. A URL
   completa permanece no convite e na sessão do emissor. Rotas públicas têm
-  CSRF no POST, no-store/no-cache, no-referrer e noindex. Não criam login.
+  CSRF no POST, no-store/no-cache, Referrer-Policy same-origin e noindex.
+  Essa política preserva Origin/Referer no próprio domínio para validar CSRF
+  em HTTPS e não envia a URL do convite a outros domínios. Não criam login.
 - Post e alvos são bloqueados antes do link para serializar decisões e reenvios
   em PostgreSQL. Testes locais usam SQLite; confirmar comportamento real na VPS.
 
@@ -59,3 +61,13 @@ lint dos módulos novos e verificação de migração de approvals passaram.
 O check global de migrações aponta uma diferença preexistente no pacote
 background_task (tipo do ID); nenhuma migração desse pacote foi criada.
 Sem envio SMTP real, publicação real ou implantação durante o desenvolvimento.
+
+## Correção CSRF em HTTPS (28/10/2026)
+
+A política inicial no-referrer (header e meta) fez o Edge enviar Origin: null
+ao submeter o formulário HTTPS, reproduzindo o erro de produção. Corrigidos
+ambos para same-origin, sem csrf_exempt nem ampliação de origens confiáveis.
+Teste no navegador agora usa HTTPS e confere os headers reais Origin e Referer;
+três novos casos verificam aprovar/rejeitar/ajustes em HTTPS e preservam 403
+para origem externa/null. Atualização só do web; reabrir o link após deploy
+para carregar o novo formulário. O 403 não registra a decisão.

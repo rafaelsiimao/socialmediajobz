@@ -13,7 +13,9 @@ from .models import ApprovalLink
 
 
 def private(response):
-    response["Referrer-Policy"] = "no-referrer"
+    # Keep same-origin POST provenance for Django's HTTPS CSRF checks while
+    # never sending the approval URL to other origins.
+    response["Referrer-Policy"] = "same-origin"
     response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
     return response
 

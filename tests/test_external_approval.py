@@ -345,3 +345,27 @@ def test_schedule_timezone_representation_does_not_change_content_hash(external_
     before_reload = content_revision(external_post)
     external_post.refresh_from_db()
     assert content_revision(external_post) == before_reload
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("decision", ["approved", "rejected", "changes_requested"])
+def test_https_form_preserves_same_origin_for_csrf(external_post, user, decision):
+    from django.test import Client
+
+    link, token = make_link(external_post, user)
+    browser = Client(enforce_csrf_checks=True)
+    url = reverse("public_approval", args=[token])
+    page = browser.get(url, secure=True)
+    assert page["Referrer-Policy"] == "same-origin"
+    assert b'<meta name="referrer" content="same-origin">' in page.content
+    csrf = browser.cookies["csrftoken"].value
+    data = {"decision": decision, "comment": "Ajustar o vídeo", "csrfmiddlewaretoken": csrf}
+    # Correct token alone must not accept a foreign or opaque Origin.
+    assert browser.post(url, data, secure=True, HTTP_ORIGIN="https://outro-site.example").status_code == 403
+    assert browser.post(url, data, secure=True, HTTP_ORIGIN="null").status_code == 403
+    response = browser.post(
+        url, data, secure=True, HTTP_ORIGIN="https://testserver", HTTP_REFERER=f"https://testserver{url}"
+    )
+    assert response.status_code == 302
+    link.refresh_from_db()
+    assert link.decision == decision
