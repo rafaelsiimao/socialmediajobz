@@ -264,6 +264,8 @@
 {% block content %}
 <div class="composer-main flex flex-col flex-1"
      x-data="composerApp()"
+     x-effect="if (!hasStoryConflict && formError === storyConflictMessage) formError = ''"
+     @ig-format-change.window="instagramFormats = { ...instagramFormats, [$event.detail.account]: $event.detail.value }"
      @keydown.meta.s.prevent="saveDraft()"
      @keydown.ctrl.s.prevent="saveDraft()">
 
@@ -297,6 +299,8 @@
         <form id="composer-form"
               hx-post="{% if post %}{% url 'composer:save_post_edit' workspace_id=workspace.id post_id=post.id %}{% else %}{% url 'composer:save_post' workspace_id=workspace.id %}{% endif %}"
               hx-swap="none"
+              @submit="if (hasStoryConflict) { $event.preventDefault(); formError = storyConflictMessage; }"
+              @htmx:before-request="if ($event.detail.elt === $el && hasStoryConflict) { $event.preventDefault(); formError = storyConflictMessage; }"
               @htmx:after-request="onFormSaved($event)"
               class="flex flex-col flex-1 min-h-0">
             <input type="hidden" name="selected_accounts" :value="selectedAccounts.join(',')">
@@ -331,6 +335,8 @@
                     <span class="text-xs text-stone-400">Nenhuma conta conectada</span>
                     {% endfor %}
                 </div>
+
+                <p x-show="hasStoryConflict" x-cloak role="alert" class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3" x-text="storyConflictMessage"></p>
 
                 <!-- Title (conditional - only when YouTube/Pinterest selected) -->
                 <div x-show="anyPlatformNeedsTitle" x-transition x-cloak>
@@ -388,7 +394,7 @@
                         </p>
                         <p x-show="igFormat === 'story'" x-cloak class="text-xs text-stone-500 mt-2">
                             Cada imagem ou vídeo (até 60 s) vira um Story, publicados em sequência na
-                            ordem das mídias (até 10). Prefira formato vertical 9:16. A legenda não aparece no Story.
+                            ordem das mídias (até 10). Prefira formato vertical 9:16. Story não usa legenda nem primeiro comentário e não pode ser combinado com outros formatos ou redes.
                         </p>
                     </fieldset>
                 </div>
@@ -399,8 +405,8 @@
                 <div x-data="{ showTemplatePicker: false }">
                     <div class="flex items-center justify-between mb-2">
                         <label class="text-sm font-semibold text-stone-500 uppercase tracking-wider"
-                               x-text="captionLabel">Legenda</label>
-                        <div class="flex items-center gap-2 relative">
+                               x-text="isStoryMode ? 'Mídias do Story' : captionLabel">Legenda</label>
+                        <div class="flex items-center gap-2 relative" x-show="!isStoryMode">
                             {% if post and is_edit %}
                             <div x-data="{ showSaveTemplate: false }">
                                 <button type="button" @click="showSaveTemplate = !showSaveTemplate"
@@ -448,6 +454,7 @@
                     </div>
                     <div class="caption-wrap">
                         <textarea name="caption"
+                                  x-show="!isStoryMode"
                                   class="caption-editor"
                                   placeholder="O que você gostaria de compartilhar?"
                                   x-model="caption"
@@ -483,7 +490,7 @@
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                                 Media Library
                             </button>
-                            <span class="text-xs tabular-nums font-medium"
+                            <span x-show="!isStoryMode" class="text-xs tabular-nums font-medium"
                                   :class="(() => { const min = Math.min(...selectedAccounts.map(id => charLimits[id]?.limit || 9999)); return caption.length > min ? 'text-red-500' : 'text-stone-400'; })()"
                                   x-text="(() => { const limits = selectedAccounts.map(id => charLimits[id]?.limit).filter(Boolean); const min = limits.length ? Math.min(...limits) : null; return min ? caption.length + ' / ' + min : caption.length; })()">
                             </span>
@@ -759,7 +766,7 @@
                 {% endfor %}
 
                 <!-- Override toggle buttons -->
-                <div class="flex flex-wrap gap-1.5" x-show="selectedAccounts.length > 0">
+                <div class="flex flex-wrap gap-1.5" x-show="selectedAccounts.length > 0 && !isStoryMode">
                     <template x-for="accId in selectedAccounts" :key="'toggle-' + accId">
                         <button type="button"
                                 class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border transition-all duration-150 cursor-pointer"
@@ -775,7 +782,7 @@
                 <!-- Platform-specific overrides -->
                 <template x-for="accId in selectedAccounts" :key="'override-' + accId">
                     <div class="border border-stone-200 rounded-xl bg-white p-4"
-                         x-show="overrides[accId]" x-transition>
+                         x-show="overrides[accId] && !isStoryMode" x-transition>
                         <div class="flex items-center gap-2 mb-3">
                             <span class="platform-icon w-5 h-5 rounded-[5px] flex items-center justify-center"
                                   :class="'pi-' + (charLimits[accId]?.platform || '')"
@@ -812,7 +819,7 @@
                               rows="1">{{ form.first_comment.value|default:"" }}</textarea>
                 </div>
                 <!-- Hidden first_comment field for form submission when section is hidden -->
-                <template x-if="!anyPlatformSupportsFirstComment">
+                <template x-if="!anyPlatformSupportsFirstComment && !isStoryMode">
                     <input type="hidden" name="first_comment" value="{{ form.first_comment.value|default:"" }}">
                 </template>
 
@@ -1276,7 +1283,9 @@
             </div>
         </div>
 
-        <div id="preview-panel" class="flex-1 overflow-y-auto p-4 space-y-4 panel-scroll"
+        <p x-show="hasStoryConflict" x-cloak class="p-4 text-sm text-stone-500">Ajuste a seleção de contas e formatos para visualizar o Story.</p>
+        <div id="preview-panel" x-show="!hasStoryConflict" class="flex-1 overflow-y-auto p-4 space-y-4 panel-scroll"
+             @htmx:before-request="if (hasStoryConflict) $event.preventDefault()"
              hx-get="{% url 'composer:preview' workspace_id=workspace.id %}"
              hx-trigger="previewUpdate from:body"
              hx-include="#composer-form"
@@ -1538,6 +1547,8 @@ function composerApp() {
         overrides: {},
         advancedOpen: {},
         platformExtras: {{ platform_extras_json|default:"{}"|safe }},
+        instagramFormats: {{ instagram_formats_json|default:"{}"|safe }},
+        storyConflictMessage: 'Story não pode ser combinado com Post, Reel ou outras redes na mesma publicação. Mantenha apenas contas do Instagram no formato Story ou crie outra publicação.',
         showMediaPicker: false,
         showThumbnailPicker: false,
         thumbnailPickerAccId: null,
@@ -1561,6 +1572,7 @@ function composerApp() {
 
         openApprovalModal(actionType) {
             if (this.selectedAccounts.length === 0) return;
+            if (this.hasStoryConflict) { this.formError = this.storyConflictMessage; return; }
             this.approvalMode = actionType === 'external_approval' ? 'external' : 'internal';
             this.approvalError = '';
             this.approvalActionType = actionType;
@@ -1608,6 +1620,15 @@ function composerApp() {
         },
 
         // Computed-like getters for title field visibility
+        isStoryAccount(id) {
+            return ['instagram', 'instagram_personal'].includes(this.charLimits[id]?.platform) && this.instagramFormats[id] === 'story';
+        },
+        get isStoryMode() {
+            return this.selectedAccounts.some(id => this.isStoryAccount(id));
+        },
+        get hasStoryConflict() {
+            return this.isStoryMode && this.selectedAccounts.some(id => !this.isStoryAccount(id));
+        },
         get anyPlatformNeedsTitle() {
             return this.selectedAccounts.some(id => this.charLimits[id]?.needs_title);
         },
@@ -1632,7 +1653,7 @@ function composerApp() {
             return 'Legenda';
         },
         get anyPlatformSupportsFirstComment() {
-            return this.selectedAccounts.some(id => this.charLimits[id]?.supports_first_comment);
+            return !this.isStoryMode && this.selectedAccounts.some(id => this.charLimits[id]?.supports_first_comment);
         },
         get autoSuggestedTitle() {
             if (!this.caption) return '';
@@ -1716,7 +1737,7 @@ function composerApp() {
             const trigger = document.getElementById('autosave-trigger');
             if (trigger) {
                 trigger.addEventListener('htmx:configRequest', (evt) => {
-                    if (this.isUploading || (this.uploadQueue && this.uploadQueue.length > 0)) {
+                    if (this.hasStoryConflict || this.isUploading || (this.uploadQueue && this.uploadQueue.length > 0)) {
                         evt.preventDefault();
                     }
                 });

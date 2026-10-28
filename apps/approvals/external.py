@@ -208,7 +208,7 @@ def preview_channels(post):
             {
                 "account": pp.social_account,
                 "caption": pp.effective_caption,
-                "title": pp.effective_title,
+                "title": "" if pp.is_instagram_story else pp.effective_title,
                 "first_comment": pp.effective_first_comment,
                 "media": assets,
                 "format": (pp.platform_extra or {}).get("post_type", "feed"),

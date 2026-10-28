@@ -492,8 +492,14 @@ class PlatformPost(models.Model):
         return self.post.title
 
     @property
+    def is_instagram_story(self):
+        return (self.platform_extra or {}).get("post_type") == "story" and self.social_account.is_instagram
+
+    @property
     def effective_caption(self):
         """Return platform-specific caption or fall back to base post caption."""
+        if self.is_instagram_story:
+            return ""
         if self.platform_specific_caption is not None:
             return self.platform_specific_caption
         return self.post.caption
@@ -501,6 +507,8 @@ class PlatformPost(models.Model):
     @property
     def effective_first_comment(self):
         """Return platform-specific first comment or fall back to base."""
+        if self.is_instagram_story:
+            return ""
         if self.platform_specific_first_comment is not None:
             return self.platform_specific_first_comment
         return self.post.first_comment

@@ -41,6 +41,7 @@ from .models import (
     PostVersion,
     Tag,
 )
+from .story import validate_story_selection
 
 
 def _get_workspace(request, workspace_id):
@@ -83,13 +84,29 @@ def _instagram_formats(request, workspace, collaborators=None):
     accepts collaborators on feed photos, carousels and Reels).
     """
     selected = [value.strip() for value in request.POST.get("selected_accounts", "").split(",") if value.strip()]
-    accounts = SocialAccount.objects.filter(workspace=workspace, platform__in=INSTAGRAM_PLATFORMS, id__in=selected)
+    accounts = list(SocialAccount.objects.filter(workspace=workspace, id__in=selected))
     formats = {
         str(account.id): request.POST[f"ig_format_{account.id}"]
         for account in accounts
-        if request.POST.get(f"ig_format_{account.id}") in IG_FORMATS
+        if account.is_instagram and request.POST.get(f"ig_format_{account.id}") in IG_FORMATS
     }
-    for acc_id, fmt in formats.items():
+    match = getattr(request, "resolver_match", None)
+    post_id = (match.kwargs.get("post_id") if match else None) or request.POST.get("_autosave_post_id")
+    stored = {}
+    if post_id:
+        stored = {
+            str(pp.social_account_id): (pp.platform_extra or {}).get("post_type", "feed")
+            for pp in PlatformPost.objects.filter(post_id=post_id, post__workspace=workspace)
+        }
+    effective = {
+        str(account.pk): (
+            formats.get(str(account.pk), stored.get(str(account.pk), "feed"))
+            if account.is_instagram else request.POST.get(f"ig_format_{account.pk}", "feed")
+        )
+        for account in accounts
+    }
+    validate_story_selection(accounts, effective)
+    for acc_id, fmt in effective.items():
         if fmt == "story" and (collaborators or {}).get(acc_id):
             raise ValueError("Stories não aceitam colaboradores. Remova os colaboradores ou publique no feed.")
     return formats
@@ -495,6 +512,7 @@ def compose(request, workspace_id, post_id=None):
         "social_accounts": social_accounts,
         "selected_account_ids": [str(aid) for aid in selected_account_ids],
         "platform_extras_json": json.dumps(platform_extras),
+        "instagram_formats_json": json.dumps({str(a.pk): a.ig_format for a in social_accounts if a.is_instagram}),
         "media_attachments": media_attachments,
         "media_items": media_items,
         "media_items_json": json.dumps(media_items),
@@ -1068,15 +1086,23 @@ def preview(request, workspace_id):
     # Build preview data per platform
     previews = []
     if selected_ids:
-        accounts = SocialAccount.objects.filter(
-            id__in=selected_ids,
-            workspace=workspace,
-        ).order_by("platform")
+        accounts = list(
+            SocialAccount.objects.filter(id__in=selected_ids, workspace=workspace).order_by("platform")
+        )
+        try:
+            validate_story_selection(accounts, {
+                str(account.pk): request.GET.get(f"ig_format_{account.pk}", "feed") for account in accounts
+            })
+        except ValueError as exc:
+            return HttpResponse(str(exc), status=400)
         for account in accounts:
             override_title_key = f"override_title_{account.id}"
             override_key = f"override_caption_{account.id}"
             effective_title = request.GET.get(override_title_key, "") or title
             effective_caption = request.GET.get(override_key, "") or caption
+            is_story = account.is_instagram and request.GET.get(f"ig_format_{account.pk}") == "story"
+            if is_story:
+                effective_caption = ""
             char_limit = account.char_limit
             field_config = account.field_config
             previews.append(
@@ -1084,7 +1110,7 @@ def preview(request, workspace_id):
                     "account": account,
                     "title": effective_title,
                     "caption": effective_caption,
-                    "first_comment": first_comment,
+                    "first_comment": "" if is_story else first_comment,
                     "char_count": len(effective_caption),
                     "char_limit": char_limit,
                     "is_over_limit": len(effective_caption) > char_limit,
