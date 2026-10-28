@@ -12,10 +12,10 @@ from providers import get_provider
 
 logger = logging.getLogger(__name__)
 
-# Platforms whose provider implements get_post_metrics with current Meta metrics.
+# Platforms whose provider implements the metrics consumed by Insights.
 # Facebook is disabled until the "nonexisting field (shares)" error is fixed
 # (see PROXIMA_SESSAO.md).
-METRICS_PLATFORMS = ("instagram", "instagram_personal", "threads")
+METRICS_PLATFORMS = ("instagram", "instagram_personal", "threads", "linkedin_company")
 # Only keep refreshing recent posts; older numbers barely change.
 METRICS_MAX_AGE_DAYS = 90
 METRICS_BATCH_SIZE = 200
@@ -30,6 +30,8 @@ def _provider_for_account(account):
     except PlatformCredential.DoesNotExist:
         env_creds = getattr(settings, "PLATFORM_CREDENTIALS_FROM_ENV", {})
         credentials = dict(env_creds.get(account.platform, {}))
+    if account.platform == "linkedin_company":
+        credentials["organization_id"] = account.account_platform_id
     return get_provider(account.platform, credentials)
 
 

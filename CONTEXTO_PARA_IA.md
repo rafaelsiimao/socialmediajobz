@@ -1,5 +1,16 @@
 # Jobz Social Media — contexto e passagem de trabalho
 
+**28/10/2026:** LinkedIn Company agora tem permissões liberadas no app
+“Jobz 2 Social”. Prioridade atual: configurar o novo par de credenciais COMPANY
+no EasyPanel, preservando o par pessoal, e conferir possível override no banco.
+Veja a atualização prioritária no início de `PROXIMA_SESSAO.md`. A pendência
+histórica de aprovação LinkedIn abaixo foi superada pela captura do usuário.
+
+Atualização: Rafael confirmou Company conectada; Insights zerados decorreram
+de coleta Company ausente e consultas sem ID da empresa. Corrigidas métricas
+de posts registrados e seguidores na rotina de saúde, com 47 testes relevantes
+passando. Ver detalhes e limitação de histórico no início de `PROXIMA_SESSAO.md`.
+
 Atualizado em 23/10/2026, com base no código local e nas confirmações do usuário.
 
 **RETOMADA ATUAL:** leia primeiro `PROXIMA_SESSAO.md`. Estamos na preparação da

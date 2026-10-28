@@ -58,6 +58,8 @@ def check_social_account_health(account_id: str):
     # Instagram via Facebook Login: address this account, not the first IG found on the token.
     if account.platform == "instagram":
         credentials = {**credentials, "ig_user_id": account.account_platform_id}
+    elif account.platform == "linkedin_company":
+        credentials = {**credentials, "organization_id": account.account_platform_id}
 
     try:
         provider = get_provider(account.platform, credentials)

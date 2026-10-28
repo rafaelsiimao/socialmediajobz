@@ -1,5 +1,54 @@
 # Retomar daqui — Jobz Social Media
 
+## Atualização prioritária — LinkedIn Company aprovado (28/10/2026)
+
+Rafael atualizou as credenciais e CONFIRMOU que Company conectou. Em seguida
+relatou Insights totalmente zerados. Falhas locais reproduzidas em 6 testes:
+`METRICS_PLATFORMS` excluía Company; provider herdado não mandava organization
+na consulta de posts; rotina de saúde consultava membro em `/v2/me`.
+Correção: incluir Company na coleta, injetar `organization_id` da SocialAccount
+em métricas e saúde, Company.get_profile consulta organization + networkSizes
+para seguidores. Company.get_post_metrics envia organizationalEntity e usa
+shares/ugcPosts conforme URN. Contagens de interações somam likes, comentários,
+shares e clicks (o campo `engagement` da API é taxa, não contagem). Raw preservado,
+likes orgânicos negativos limitados a zero no snapshot não negativo.
+47 testes relevantes passaram, incluindo Insights, métricas, saúde e OAuth
+LinkedIn. HTTP simulado: falta confirmação de métricas reais na VPS após deploy
+web+worker. Rotinas existentes: métricas a cada 3h, saúde/seguidores a cada 6h.
+No detalhe de post já registrado há botão de atualizar métricas manualmente.
+Se canal já tiver status ERROR por tentativa anterior, verificar/reexecutar
+checagem de saúde ou reconectar; o agendador de saúde só lista connected e
+token_expiring. Não afirmar que foi executado em produção.
+IMPORTANTE: importação de posts antigos continua só para Instagram; esta
+correção não importa histórico externo LinkedIn. A página Insights agrega
+PlatformPosts já registrados, não um total geral remoto da Company Page.
+Sem migração, sem troca de credenciais, sem publicação real.
+Referências: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/share-statistics
+e https://learn.microsoft.com/en-us/linkedin/marketing/community-management/organizations/organization-lookup-api
+
+Rafael retornou após alterações externas; HEAD conferido `89666c6`, árvore
+limpa antes desta atualização documental. Captura do app **Jobz 2 Social**
+mostra os três scopes que o provider pede: `w_organization_social`,
+`r_organization_social`, `rw_organization_admin`, e callback correto
+`https://socialmedia-web.hqzarv.easypanel.host/social-accounts/callback/linkedin_company/`.
+Portanto, a pendência histórica de aprovação Company não descreve mais o estado
+atual. LinkedIn pessoal já funcionava e usa outro aplicativo.
+
+Pedido atual: verificar se é necessário colocar as NOVAS credenciais no ambiente.
+Confirmado no código: `PLATFORM_LINKEDIN_COMPANY_CLIENT_ID` e
+`PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET`; na ausência dessas variáveis, os
+valores de `PLATFORM_LINKEDIN_CLIENT_ID/SECRET` (perfil pessoal) são usados.
+Orientar preencher as duas variáveis COMPANY com o par do app aprovado em web
+e worker, salvar/implantar e tentar conectar LinkedIn Company novamente.
+Preservar as variáveis pessoais. Não solicitar o secret na conversa.
+
+Importante: `_get_provider_for_platform` e engine dão preferência a
+`PlatformCredential` de `linkedin_company` configurado no BANCO da organização;
+só depois usam ambiente. Caso trocar ambiente não altere a conexão, verificar
+esse cadastro antes de mudar código. Não foi acessado ambiente/banco da VPS:
+credenciais antigas em produção são hipótese, não confirmação. Não houve
+alteração de código nem nova publicação/autorização real nesta checagem.
+
 Atualizado em 23/10/2026. Rafael pediu este arquivo para continuar em outra
 sessão sem recomeçar, pois está com pouco uso disponível.
 

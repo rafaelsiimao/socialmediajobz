@@ -11,7 +11,7 @@ import logging
 
 from .exceptions import APIError
 from .linkedin import API_BASE, LINKEDIN_HEADERS, LinkedInProvider
-from .types import PublishContent, PublishResult
+from .types import AccountProfile, PostMetrics, PublishContent, PublishResult
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,77 @@ class LinkedInCompanyProvider(LinkedInProvider):
             "r_organization_social",
             "rw_organization_admin",
         ]
+
+    def _organization_id(self) -> str:
+        organization_id = str(self.credentials.get("organization_id") or "")
+        if not organization_id.isdigit():
+            raise APIError("LinkedIn Company requires the connected organization ID.", platform=self.platform_name)
+        return organization_id
+
+    def get_profile(self, access_token: str) -> AccountProfile:
+        organization_id = self._organization_id()
+        organization = self._request(
+            "GET",
+            f"{API_BASE}/rest/organizations/{organization_id}",
+            access_token=access_token,
+            headers=LINKEDIN_HEADERS,
+        ).json()
+        network = self._request(
+            "GET",
+            f"{API_BASE}/rest/networkSizes/urn:li:organization:{organization_id}",
+            access_token=access_token,
+            headers=LINKEDIN_HEADERS,
+            params={"edgeType": "COMPANY_FOLLOWED_BY_MEMBER"},
+        ).json()
+        # Missing follower data is an API failure, not evidence of zero followers.
+        if "firstDegreeSize" not in network:
+            raise APIError("LinkedIn did not return the organization's follower count.", platform=self.platform_name)
+        return AccountProfile(
+            platform_id=organization_id,
+            name=organization.get("localizedName")
+            or organization.get("vanityName")
+            or f"Organization {organization_id}",
+            handle=organization.get("vanityName"),
+            follower_count=int(network["firstDegreeSize"]),
+            extra=organization,
+        )
+
+    def get_post_metrics(self, access_token: str, post_id: str) -> PostMetrics:
+        organization_id = self._organization_id()
+        if post_id.startswith("urn:li:share:"):
+            key = "shares"
+        elif post_id.startswith("urn:li:ugcPost:"):
+            key = "ugcPosts"
+        else:
+            raise APIError("Unsupported LinkedIn post identifier.", platform=self.platform_name)
+        data = self._request(
+            "GET",
+            f"{API_BASE}/rest/organizationalEntityShareStatistics",
+            access_token=access_token,
+            headers=LINKEDIN_HEADERS,
+            params={
+                "q": "organizationalEntity",
+                "organizationalEntity": f"urn:li:organization:{organization_id}",
+                key: f"List({post_id})",
+            },
+        ).json()
+        elements = data.get("elements", [])
+        stats = elements[0].get("totalShareStatistics", {}) if elements else {}
+        # LinkedIn's `engagement` is a rate; the dashboard needs the interaction count.
+        # Organic likeCount can be negative; snapshots store nonnegative counts.
+        likes, comments, shares, clicks = (
+            max(0, int(stats.get(field, 0))) for field in ("likeCount", "commentCount", "shareCount", "clickCount")
+        )
+        return PostMetrics(
+            impressions=max(0, int(stats.get("impressionCount", 0))),
+            reach=max(0, int(stats.get("uniqueImpressionsCount", 0))),
+            likes=likes,
+            comments=comments,
+            shares=shares,
+            clicks=clicks,
+            engagements=likes + comments + shares + clicks,
+            extra={"raw_statistics": stats, "permalink": self._post_urn_to_url(post_id)},
+        )
 
     def get_user_pages(self, access_token: str) -> list[dict]:
         """Fetch the organization / company pages that the authenticated user administers.
@@ -69,11 +140,7 @@ class LinkedInCompanyProvider(LinkedInProvider):
                     headers=LINKEDIN_HEADERS,
                 )
                 org_data = org_resp.json()
-                org_name = (
-                    org_data.get("localizedName")
-                    or org_data.get("vanityName")
-                    or f"Organization {org_id}"
-                )
+                org_name = org_data.get("localizedName") or org_data.get("vanityName") or f"Organization {org_id}"
                 vanity_name = org_data.get("vanityName", "")
             except APIError:
                 logger.warning("Could not fetch details for LinkedIn organization %s", org_id)
