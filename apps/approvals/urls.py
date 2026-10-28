@@ -1,10 +1,12 @@
 from django.urls import path
 
-from . import views
+from . import public_views, views
 
 app_name = "approvals"
 
 urlpatterns = [
+    path("approvals/link/<uuid:link_id>/", public_views.link_details, name="link_details"),
+    path("approvals/link/<uuid:link_id>/retry/", public_views.retry_email, name="retry_email"),
     path("approvals/", views.approval_queue, name="queue"),
     path("approvals/<uuid:post_id>/approve/", views.approve, name="approve"),
     path("approvals/<uuid:post_id>/request-changes/", views.request_changes_view, name="request_changes"),

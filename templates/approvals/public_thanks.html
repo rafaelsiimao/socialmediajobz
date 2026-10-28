@@ -1,0 +1,3 @@
+{% extends "approvals/public_base.html" %}
+{% block content %}<section><h1>Obrigado!</h1><p>Sua resposta foi registrada e a equipe será notificada.</p><p>O link de aprovação já foi encerrado. Esta página será encerrada em 10 segundos.</p></section>{% endblock %}
+{% block scripts %}<script>setTimeout(function(){ location.replace('{% url "public_approval_closed" %}'); }, 10000);</script>{% endblock %}

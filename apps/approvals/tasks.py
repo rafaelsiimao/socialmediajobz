@@ -165,3 +165,7 @@ def _escalate(post, stage):
                 "stage": stage,
             },
         )
+
+
+# Register external approval email jobs with the existing worker discovery.
+from .email_tasks import deliver_approval_email  # noqa: E402,F401

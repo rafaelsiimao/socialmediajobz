@@ -16,6 +16,7 @@ from django.db import models, transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import strip_tags
 from django.views.decorators.http import require_GET, require_POST
@@ -176,6 +177,9 @@ def _sync_platform_posts(request, post, workspace, initial_status=None):
 
 def _save_version(post, user):
     """Create a PostVersion snapshot."""
+    from apps.approvals.external import invalidate_changed_links
+
+    invalidate_changed_links(post)
     version_number = (post.versions.count()) + 1
     snapshot = {
         "title": post.title,
@@ -508,6 +512,7 @@ def compose(request, workspace_id, post_id=None):
         "show_submit_button": show_submit_button,
         "show_resubmit_button": show_resubmit_button,
         "approval_history": approval_history,
+        "latest_external_approval": post.external_approvals.order_by("-created_at").first() if post else None,
         "post_comments": post_comments,
         "pending_assets": pending_assets,
         "all_tags": all_tags,
@@ -633,6 +638,23 @@ def save_post(request, workspace_id, post_id=None):
     """Save or update a post (draft, schedule, or publish action)."""
     workspace = _get_workspace(request, workspace_id)
     action = request.POST.get("action", "save_draft")
+
+    if action == "external_approval":
+        from django.core.validators import validate_email
+
+        membership = request.workspace_membership
+        if not membership or not membership.effective_permissions.get("approve_posts"):
+            raise PermissionDenied("Você não pode enviar para aprovação externa.")
+        name = request.POST.get("approval_name", "").strip()
+        email = request.POST.get("approval_email", "").strip()
+        try:
+            validate_email(email)
+        except ValidationError:
+            return JsonResponse({"errors": {"approval_email": ["Informe um e-mail válido."]}}, status=400)
+        if not name or len(name) > 150 or len(email) > 254:
+            return JsonResponse({"errors": {"approval_name": ["Informe o nome do cliente (até 150 caracteres)."]}}, status=400)
+        if post_id and Post.objects.filter(pk=post_id, workspace=workspace, platform_posts__status__in=["scheduled", "publishing", "published", "failed"]).exists():
+            return JsonResponse({"errors": {"approval": ["Salve como rascunho antes de enviar para aprovação externa."]}}, status=400)
 
     if post_id:
         post = get_object_or_404(Post, id=post_id, workspace=workspace)
@@ -764,6 +786,27 @@ def save_post(request, workspace_id, post_id=None):
                 },
             )
         return redirect("composer:compose_edit", workspace_id=workspace.id, post_id=post.id)
+    elif action == "external_approval":
+        from apps.approvals.external import issue_link
+
+        with transaction.atomic():
+            post.save()
+            _sync_post_media(request, post, workspace)
+            _sync_platform_posts(request, post, workspace, initial_status="draft")
+            propagate_dt = getattr(post, "_schedule_propagate_dt", None)
+            if propagate_dt is not None:
+                post.platform_posts.update(scheduled_at=propagate_dt)
+            try:
+                link, token = issue_link(post, request.user, name, email)
+            except ValueError as exc:
+                transaction.set_rollback(True)
+                return JsonResponse({"errors": {"approval": [str(exc)]}}, status=400)
+            _save_version(post, request.user)
+        request.session[f"approval_link_{link.pk}"] = token
+        url = reverse("approvals:link_details", kwargs={"workspace_id": workspace.pk, "link_id": link.pk})
+        if request.htmx:
+            return HttpResponse(status=204, headers={"HX-Redirect": url})
+        return redirect(url)
     elif action == "submit_for_approval":
         # Save post first so it has a PK, then delegate to approval service
         post.save()
@@ -998,6 +1041,9 @@ def autosave(request, workspace_id, post_id=None):
         if acc_id in collaborators or acc_id in formats:
             platform_post.save(update_fields=["platform_extra", "updated_at"])
 
+    from apps.approvals.external import invalidate_changed_links
+
+    invalidate_changed_links(post)
     return HttpResponse(
         f'<span class="text-xs text-gray-400">Saved {timezone.now().strftime("%H:%M")}</span>',
         headers={"HX-Trigger": json.dumps({"autosaved": {"postId": str(post.id), "isNew": is_new}})},

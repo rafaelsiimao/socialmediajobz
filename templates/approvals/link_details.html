@@ -1,0 +1,22 @@
+{% extends "approvals/public_base.html" %}
+{% block content %}<section><h1>Aprovação solicitada</h1>
+<p>Destinatário: {{ link.recipient_name }} · {{ link.recipient_email }}</p>
+<p>Validade: {{ link.expires_at|date:"d/m/Y H:i" }}. Uma resposta por link.</p>
+{% if link.responded_at %}<p><strong>Resposta registrada:</strong> {{ link.decision }} · {{ link.responded_at|date:"d/m/Y H:i" }}</p><p class="caption">{{ link.comment }}</p>{% endif %}
+{% if approval_url %}<label for="approval-url">Link para compartilhar com o cliente</label>
+<input id="approval-url" value="{{ approval_url }}" readonly>
+<button id="copy-link" type="button">Copiar link</button><span id="copy-status" role="status"></span>
+{% else %}<p>O link completo está disponível na sessão que o gerou e no convite enviado ao cliente. Para substituí-lo, volte à publicação e envie uma nova solicitação.</p>{% endif %}
+{% for email in emails %}<p>{% if email.kind == 'invitation' %}Convite{% else %}Resultado{% endif %}:
+{% if email.sent_at %}enviado ao servidor de e-mail em {{ email.sent_at|date:"d/m/Y H:i" }}.{% elif email.error %}não enviado; verifique o link ou tente novamente.{% else %}aguardando envio pelo worker.{% endif %}</p>{% endfor %}
+<p class="muted">A confirmação do servidor não garante que a mensagem chegou à caixa de entrada. Você também pode compartilhar o link por WhatsApp.</p>
+<form method="post" action="{% url 'approvals:retry_email' workspace_id=workspace.id link_id=link.id %}">{% csrf_token %}<button type="submit">Tentar e-mails pendentes novamente</button></form>
+<p><a href="{% url 'composer:compose_edit' workspace_id=workspace.id post_id=link.post_id %}">Voltar à publicação</a></p></section>{% endblock %}
+{% block scripts %}<script>
+const copy = document.getElementById('copy-link');
+if(copy) copy.addEventListener('click', async function(){
+  const input = document.getElementById('approval-url');
+  try { await navigator.clipboard.writeText(input.value); document.getElementById('copy-status').textContent=' Link copiado.'; }
+  catch(error) { input.select(); document.getElementById('copy-status').textContent=' Selecione e copie o link com Ctrl+C.'; }
+});
+</script>{% endblock %}

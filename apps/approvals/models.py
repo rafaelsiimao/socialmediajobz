@@ -12,6 +12,41 @@ from django.conf import settings
 from django.db import models
 
 
+class ApprovalLink(models.Model):
+    """A single-use capability for one immutable revision of a post."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    post = models.ForeignKey("composer.Post", on_delete=models.CASCADE, related_name="external_approvals")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    token_hash = models.CharField(max_length=64, unique=True)
+    recipient_name = models.CharField(max_length=150)
+    recipient_email = models.EmailField()
+    content_hash = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    decision = models.CharField(max_length=20, blank=True)
+    comment = models.TextField(blank=True)
+
+
+class ApprovalEmail(models.Model):
+    """Durable outbox, independent of the client's platform membership."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    link = models.ForeignKey(ApprovalLink, on_delete=models.CASCADE, related_name="emails")
+    kind = models.CharField(max_length=20)
+    recipient = models.EmailField()
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+    attempts = models.PositiveIntegerField(default=0)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    error = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["link", "kind"], name="unique_approval_email_kind")]
+
+
 class ApprovalAction(models.Model):
     """Audit trail entry for an approval workflow action on a post."""
 

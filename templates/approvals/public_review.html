@@ -1,0 +1,39 @@
+{% extends "approvals/public_base.html" %}
+{% block content %}
+<h1>Olá, {{ link.recipient_name }}! Revise esta publicação.</h1>
+<p>{{ link.post.workspace.name }} · Responda até {{ link.expires_at|date:"d/m/Y H:i" }}.</p>
+<p class="muted">Este link é pessoal. Quem tiver acesso a ele pode registrar a resposta em seu nome. Não encaminhe a terceiros.</p>
+{% for channel in channels %}<article>
+<h2>{{ channel.account.account_name }} · {{ channel.account.get_platform_display }}</h2>
+{% if channel.account.is_instagram %}<p class="muted">Formato: {% if channel.format == 'reel' %}Reel{% elif channel.format == 'story' %}Story{% else %}Publicação no feed{% endif %}</p>{% endif %}
+{% if channel.collaborators %}<p class="muted">Colaboradores: {{ channel.collaborators|join:", " }}</p>{% endif %}
+{% if channel.title %}<h3>{{ channel.title }}</h3>{% endif %}
+{% for asset in channel.media %}
+{% if asset.is_video %}<video src="{{ asset.file.url }}" controls playsinline preload="metadata" aria-label="Vídeo da publicação"></video>
+{% elif asset.is_image %}<img src="{{ asset.file.url }}" alt="Imagem {{ forloop.counter }} da publicação" loading="lazy">{% endif %}
+{% endfor %}
+<p class="caption">{{ channel.caption }}</p>
+{% if channel.first_comment %}<p><strong>Primeiro comentário:</strong> {{ channel.first_comment }}</p>{% endif %}
+</article>{% endfor %}
+<section><h2>Sua decisão</h2>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<form method="post">{% csrf_token %}
+<label for="comment">Comentários ou ajustes</label>
+<textarea id="comment" name="comment" rows="5" maxlength="10000" aria-describedby="comment-help">{{ comment }}</textarea>
+<p id="comment-help" class="muted">Para rejeitar ou pedir ajustes, explique o que precisa mudar. Após confirmar, sua resposta não poderá ser alterada neste link.</p>
+<button type="submit" name="decision" value="approved">Aprovar</button>
+<button type="submit" name="decision" value="rejected">Rejeitar</button>
+<button type="submit" name="decision" value="changes_requested">Precisa de ajustes</button>
+</form></section>
+{% endblock %}
+{% block scripts %}<script>
+document.querySelector('form').addEventListener('submit', function(event) {
+  const comment = document.getElementById('comment');
+  if (event.submitter.value !== 'approved' && !comment.value.trim()) {
+    event.preventDefault(); comment.setCustomValidity('Descreva o motivo ou os ajustes necessários.'); comment.reportValidity();
+  }
+});
+document.getElementById('comment').addEventListener('input', function(){ this.setCustomValidity(''); });
+// A previously opened tab must not keep an active form after returning through browser history.
+window.addEventListener('pageshow', function(event){ if(event.persisted) location.reload(); });
+</script>{% endblock %}

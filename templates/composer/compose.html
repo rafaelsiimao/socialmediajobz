@@ -1017,6 +1017,14 @@
                     <span class="sm:hidden">Salvar</span>
                 </button>
 
+                {% if request.workspace_membership.effective_permissions.approve_posts %}
+                {% if latest_external_approval %}<a href="{% url 'approvals:link_details' workspace_id=workspace.id link_id=latest_external_approval.id %}" class="text-xs text-blue-700 underline">Ver link e envio</a>{% endif %}
+                <button type="button" @click="approvalMode = 'external'; openApprovalModal('external_approval')"
+                        :disabled="selectedAccounts.length === 0"
+                        class="inline-flex items-center px-3 py-2 text-sm font-semibold text-blue-700 rounded-lg border border-blue-200">
+                    Aprovação por link
+                </button>
+                {% endif %}
                 {% if show_submit_button %}
                 <button type="button"
                         @click="openApprovalModal('submit_for_approval')"
@@ -1206,8 +1214,8 @@
                 <div class="flex items-start gap-2">
                     <div class="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 {% if action.action == 'approved' %}bg-emerald-400{% elif action.action == 'rejected' %}bg-red-400{% elif action.action == 'changes_requested' %}bg-amber-400{% else %}bg-stone-300{% endif %}"></div>
                     <div>
-                        <p class="text-xs text-stone-600"><span class="font-semibold">{{ action.user.display_name }}</span> {{ action.get_action_display|lower }}</p>
-                        {% if action.comment %}<p class="text-xs text-stone-400 mt-0.5">"{{ action.comment|truncatechars:80 }}"</p>{% endif %}
+                        <p class="text-xs text-stone-600"><span class="font-semibold">{{ action.user.display_name|default:"Cliente por link" }}</span> {{ action.get_action_display|lower }}</p>
+                        {% if action.comment %}<details class="text-xs text-stone-500 mt-0.5"><summary class="cursor-pointer">{{ action.comment|truncatechars:80 }}</summary><p class="whitespace-pre-wrap break-words">{{ action.comment }}</p></details>{% endif %}
                         <p class="text-[10px] text-stone-400">{{ action.created_at|timesince }} ago</p>
                     </div>
                 </div>
@@ -1461,11 +1469,26 @@
                 </div>
                 <div>
                     <h3 class="text-base font-bold text-stone-900" x-text="approvalActionType === 'resubmit_for_approval' ? 'Reenviar para Aprovação' : 'Enviar para Aprovação'"></h3>
-                    <p class="text-xs text-stone-500 mt-0.5">Escolha quem será notificado para revisar e aprovar esta publicação.</p>
+                    <p class="text-xs text-stone-500 mt-0.5">Escolha a revisão interna ou envie um link ao cliente, sem login.</p>
                 </div>
             </div>
 
-            <div class="mb-5">
+            {% if request.workspace_membership.effective_permissions.approve_posts %}
+            <label class="block text-sm font-semibold mb-2" for="approval-mode">Tipo de aprovação</label>
+            <select id="approval-mode" x-model="approvalMode" class="w-full border rounded-lg p-2 mb-4">
+                <option value="internal">Revisão interna</option>
+                <option value="external">Cliente por link temporário (sem login)</option>
+            </select>
+            <div x-show="approvalMode === 'external'" class="mb-5">
+                <label for="approval-name" class="block text-sm mb-1">Nome do cliente</label>
+                <input id="approval-name" type="text" x-model="approvalName" maxlength="150" class="w-full border rounded-lg p-2 mb-3" autocomplete="name">
+                <label for="approval-email" class="block text-sm mb-1">E-mail do cliente</label>
+                <input id="approval-email" type="email" x-model="approvalEmail" maxlength="254" class="w-full border rounded-lg p-2" autocomplete="email">
+                <p class="text-xs text-stone-500 mt-2">Link válido por 7 dias, com uma resposta. Você também poderá copiar e compartilhar. Reenviar substitui o link anterior.</p>
+                <p role="alert" class="text-sm text-red-600" x-text="approvalError"></p>
+            </div>
+            {% endif %}
+            <div class="mb-5" x-show="approvalMode === 'internal'">
                 <label class="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">Revisor Responsável</label>
                 <div class="relative">
                     <select x-model="selectedReviewerId"
@@ -1530,15 +1553,25 @@ function composerApp() {
         showApprovalModal: false,
         approvalActionType: 'submit_for_approval',
         selectedReviewerId: '{{ post.assigned_reviewer_id|default:"" }}',
+        approvalMode: 'internal',
+        approvalName: '',
+        approvalEmail: '',
+        approvalError: '',
         submittingApproval: false,
 
         openApprovalModal(actionType) {
             if (this.selectedAccounts.length === 0) return;
+            this.approvalMode = actionType === 'external_approval' ? 'external' : 'internal';
+            this.approvalError = '';
             this.approvalActionType = actionType;
             this.showApprovalModal = true;
         },
 
         submitApprovalForm() {
+            if (this.approvalMode === 'external' && (!this.approvalName.trim() || !document.getElementById('approval-email').checkValidity() || !this.approvalEmail.trim())) {
+                this.approvalError = 'Informe o nome e um e-mail válido para o cliente.';
+                return;
+            }
             this.submittingApproval = true;
             const form = document.getElementById('composer-form');
             if (!form) return;
@@ -1553,11 +1586,17 @@ function composerApp() {
             }
             revInput.value = this.selectedReviewerId;
 
+            for (const [key, value] of Object.entries({approval_name: this.approvalName, approval_email: this.approvalEmail})) {
+                let input = form.querySelector(`input[name="${key}"]`);
+                if (!input) { input = document.createElement('input'); input.type = 'hidden'; input.name = key; form.appendChild(input); }
+                input.value = value;
+            }
+
             // Create temporary submit button with name="action"
             const tempBtn = document.createElement('button');
             tempBtn.type = 'submit';
             tempBtn.name = 'action';
-            tempBtn.value = this.approvalActionType;
+            tempBtn.value = this.approvalMode === 'external' ? 'external_approval' : (this.approvalActionType === 'external_approval' ? 'submit_for_approval' : this.approvalActionType);
             tempBtn.style.display = 'none';
             form.appendChild(tempBtn);
 
