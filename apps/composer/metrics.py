@@ -13,9 +13,7 @@ from providers import get_provider
 logger = logging.getLogger(__name__)
 
 # Platforms whose provider implements the metrics consumed by Insights.
-# Facebook is disabled until the "nonexisting field (shares)" error is fixed
-# (see PROXIMA_SESSAO.md).
-METRICS_PLATFORMS = ("instagram", "instagram_personal", "threads", "linkedin_company")
+METRICS_PLATFORMS = ("instagram", "instagram_personal", "threads", "linkedin_company", "facebook")
 # Only keep refreshing recent posts; older numbers barely change.
 METRICS_MAX_AGE_DAYS = 90
 METRICS_BATCH_SIZE = 200

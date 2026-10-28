@@ -1,5 +1,30 @@
 # Retomar daqui — Jobz Social Media
 
+## Métricas Facebook — correção de código (28/10/2026)
+
+Rafael confirmou publicação LinkedIn funcionando, faltando validar os números.
+Solicitou identificar o problema das métricas Facebook. Confirmado no código:
+Facebook continuava excluído de `METRICS_PLATFORMS` e o fallback para foto
+resolvida em `page_story_id` deixava escapar novo erro de campo `shares`.
+Quatro casos falharam antes do ajuste; correção e regressões passaram em
+132 testes (providers, métricas, Insights, Company).
+
+Facebook reativado para coleta periódica e botão Atualizar agora no modal de
+post publicado. Fallback aceita só HTTP400 de campo inexistente (código100
+quando presente); não tenta contornar erro de token/permissão. Se nem o post
+resolvido oferecer os campos completos, lê reações/comentários da mídia e
+registra aviso em `insights_error` de compartilhamentos indisponíveis. Não
+silenciar indisponibilidade como coleta integral bem-sucedida.
+
+Sem migração, sem troca de tokens nem alteração do fluxo de publicação. Sem
+teste real na VPS: o log histórico `nonexisting field (shares)` não comprova
+qual objeto/versão de deploy gerou o erro; se persistir após deploy web/worker,
+usar Atualizar agora no post afetado e obter erro/log atual. Não prometer todos
+os números: esta coleta só inclui reações, comentários e compartilhamentos
+quando disponíveis. Alcance/visualizações e métricas gerais da Página não
+foram implementados aqui. Facebook.get_profile ainda não consulta seguidores;
+não afirmar que esta correção traz seguidores do Facebook.
+
 ## Atualização prioritária — LinkedIn Company aprovado (28/10/2026)
 
 Rafael atualizou as credenciais e CONFIRMOU que Company conectou. Em seguida

@@ -313,6 +313,16 @@ class FacebookProvider(SocialProvider):
     POST_METRIC_FIELDS = "permalink_url,shares,comments.summary(true).limit(0),reactions.summary(true).limit(0)"
     MEDIA_METRIC_FIELDS = "comments.summary(true).limit(0),reactions.summary(true).limit(0)"
 
+    @staticmethod
+    def _is_missing_field_error(exc: APIError) -> bool:
+        error = exc.raw_response.get("error", {})
+        message = str(error.get("message") or exc).lower()
+        return (
+            exc.status_code == 400
+            and error.get("code") in (None, 100)
+            and ("nonexisting field" in message or "non-existing field" in message)
+        )
+
     def _get_fields(self, access_token: str, object_id: str, fields: str) -> dict:
         return self._request(
             "GET",
@@ -324,11 +334,21 @@ class FacebookProvider(SocialProvider):
     def _metrics_for_media_id(self, access_token: str, media_id: str) -> dict:
         try:
             story_id = self._get_fields(access_token, media_id, "page_story_id").get("page_story_id")
-        except APIError:
+        except APIError as exc:
+            if not self._is_missing_field_error(exc):
+                raise
             story_id = None
         if story_id:
-            return self._get_fields(access_token, story_id, self.POST_METRIC_FIELDS)
-        return self._get_fields(access_token, media_id, self.MEDIA_METRIC_FIELDS)
+            try:
+                return self._get_fields(access_token, story_id, self.POST_METRIC_FIELDS)
+            except APIError as exc:
+                if not self._is_missing_field_error(exc):
+                    raise
+        data = self._get_fields(access_token, media_id, self.MEDIA_METRIC_FIELDS)
+        data["_metrics_warning"] = (
+            "Compartilhamentos indisponíveis para este tipo de mídia; reações e comentários foram consultados."
+        )
+        return data
 
     def get_post_metrics(self, access_token: str, post_id: str) -> PostMetrics:
         # Post-level counters only need pages_read_engagement. Insights metrics
@@ -336,20 +356,23 @@ class FacebookProvider(SocialProvider):
         # their replacements require read_insights, which this app does not request.
         try:
             data = self._get_fields(access_token, post_id, self.POST_METRIC_FIELDS)
-        except APIError:
+        except APIError as exc:
+            if not self._is_missing_field_error(exc):
+                raise
             # Older photo/video posts stored the media ID, which has no ``shares``
             # field. Resolve the feed post behind a photo, else read media counters.
             data = self._metrics_for_media_id(access_token, post_id)
         reactions = data.get("reactions", {}).get("summary", {}).get("total_count", 0)
         comments = data.get("comments", {}).get("summary", {}).get("total_count", 0)
         shares = data.get("shares", {}).get("count", 0)
+        warning = data.pop("_metrics_warning", "")
 
         return PostMetrics(
             likes=reactions,
             comments=comments,
             shares=shares,
             engagements=reactions + comments + shares,
-            extra={"raw_fields": data, "permalink": data.get("permalink_url", "")},
+            extra={"raw_fields": data, "permalink": data.get("permalink_url", ""), "insights_error": warning},
         )
 
     def get_account_metrics(self, access_token: str, date_range: tuple[datetime, datetime]) -> AccountMetrics:

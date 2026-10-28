@@ -1,5 +1,10 @@
 # Jobz Social Media — contexto e passagem de trabalho
 
+**28/10/2026 — Facebook:** corrigida lacuna do fallback de `shares`, reativada
+coleta e botão manual; 132 testes relevantes passaram. Correção cobre contagens
+de reações/comentários/compartilhamentos, não alcance/visualizações/seguidores.
+Falta validar com post real após deploy. Ver início de `PROXIMA_SESSAO.md`.
+
 **28/10/2026:** LinkedIn Company agora tem permissões liberadas no app
 “Jobz 2 Social”. Prioridade atual: configurar o novo par de credenciais COMPANY
 no EasyPanel, preservando o par pessoal, e conferir possível override no banco.

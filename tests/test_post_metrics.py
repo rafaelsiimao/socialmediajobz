@@ -211,7 +211,7 @@ def test_facebook_metrics_resolve_photo_id_to_feed_post():
         fields = kwargs["params"]["fields"]
         calls.append((object_id, fields))
         if object_id == "photo-1" and "shares" in fields:
-            raise APIError('(#100) Tried accessing nonexisting field (shares)', status_code=400)
+            raise APIError("(#100) Tried accessing nonexisting field (shares)", status_code=400)
         if object_id == "photo-1":
             return _response({"page_story_id": "page_post"})
         return _response(
@@ -259,7 +259,7 @@ def test_facebook_photo_publish_stores_feed_post_id():
 
 
 @pytest.mark.django_db
-def test_facebook_posts_are_skipped_while_metrics_are_disabled(client, published_post):
+def test_facebook_posts_are_collected_and_offer_manual_refresh(client, published_post):
     workspace, platform_post = published_post
     fb_account = SocialAccount.objects.create(
         workspace=workspace, platform="facebook", account_platform_id="fb-page", account_name="Jobz FB"
@@ -267,7 +267,7 @@ def test_facebook_posts_are_skipped_while_metrics_are_disabled(client, published
     fb_post = platform_post.post.platform_posts.create(
         social_account=fb_account, status="published", platform_post_id="photo-1", published_at=timezone.now()
     )
-    assert fb_post not in list(platform_posts_needing_metrics())
+    assert fb_post in list(platform_posts_needing_metrics())
 
     body = client.get(
         reverse(
@@ -275,5 +275,28 @@ def test_facebook_posts_are_skipped_while_metrics_are_disabled(client, published
             kwargs={"workspace_id": workspace.id, "platform_post_id": fb_post.id},
         )
     ).content.decode()
-    assert "Métricas ainda não disponíveis" in body
-    assert "Atualizar agora" not in body
+    assert "Métricas ainda não disponíveis" not in body
+    assert "Atualizar agora" in body
+
+
+def test_facebook_media_metrics_survive_unsupported_shares_on_resolved_post():
+    def fake_request(self, method, url, **kwargs):
+        fields = kwargs["params"]["fields"]
+        if "shares" in fields:
+            raise APIError("(#100) Tried accessing nonexisting field (shares)", status_code=400)
+        if fields == "page_story_id":
+            return _response({"page_story_id": "page_post"})
+        return _response({"comments": {"summary": {"total_count": 2}}, "reactions": {"summary": {"total_count": 8}}})
+
+    with patch.object(SocialProvider, "_request", fake_request):
+        result = FacebookProvider({}).get_post_metrics("fake-token", "photo-1")
+    assert (result.likes, result.comments, result.engagements) == (8, 2, 10)
+    assert "insights_error" in result.extra
+
+
+@pytest.mark.parametrize("status,code", [(403, 10), (400, 190)])
+def test_facebook_permissions_and_token_errors_do_not_trigger_media_fallback(status, code):
+    error = APIError("Facebook access denied", status_code=status, raw_response={"error": {"code": code}})
+    with patch.object(SocialProvider, "_request", side_effect=error) as request, pytest.raises(APIError):
+        FacebookProvider({}).get_post_metrics("fake-token", "page_post")
+    assert request.call_count == 1
