@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from .base import SocialProvider
 from .exceptions import APIError, OAuthError, PublishError
@@ -61,7 +61,7 @@ class FacebookProvider(SocialProvider):
 
     @property
     def supported_post_types(self) -> list[PostType]:
-        return [PostType.TEXT, PostType.IMAGE, PostType.VIDEO, PostType.LINK]
+        return [PostType.TEXT, PostType.IMAGE, PostType.CAROUSEL, PostType.VIDEO, PostType.LINK]
 
     @property
     def supported_media_types(self) -> list[MediaType]:
@@ -232,7 +232,20 @@ class FacebookProvider(SocialProvider):
                 platform=self.platform_name,
             )
 
-        if content.post_type == PostType.IMAGE and content.media_urls:
+        # Never silently publish only the first attachment of a mixed/video set.
+        sources = content.media_files or content.media_urls
+        if len(sources) > 1 and (
+            content.post_type == PostType.VIDEO
+            or any(urlsplit(source).path.lower().endswith((".mp4", ".mov", ".webm", ".avi", ".m4v")) for source in sources)
+        ):
+            raise PublishError(
+                "Esta integração do Facebook aceita várias fotos ou um vídeo por publicação. Separe os vídeos.",
+                platform=self.platform_name,
+            )
+
+        if content.post_type in (PostType.IMAGE, PostType.CAROUSEL) and content.media_urls:
+            if len(content.media_urls) > 1:
+                return self._publish_photos(access_token, page_id, content)
             return self._publish_photo(access_token, page_id, content)
         if content.post_type == PostType.VIDEO and content.media_urls:
             return self._publish_video(access_token, page_id, content)
@@ -273,6 +286,49 @@ class FacebookProvider(SocialProvider):
             platform_post_id=post_id,
             url=f"https://www.facebook.com/{post_id}",
             extra=data,
+        )
+
+    def _publish_photos(self, access_token: str, page_id: str, content: PublishContent) -> PublishResult:
+        photo_ids = []
+        for url in content.media_urls:
+            resp = self._request(
+                "POST",
+                f"{BASE_URL}/{page_id}/photos",
+                access_token=access_token,
+                json={"url": url, "published": False},
+            )
+            data = resp.json()
+            photo_id = data.get("id")
+            if not photo_id:
+                raise PublishError(
+                    "O Facebook não retornou o ID de uma das fotos. A publicação não foi criada.",
+                    platform=self.platform_name,
+                    raw_response=data,
+                )
+            photo_ids.append(photo_id)
+
+        # Only create the visible feed post after every photo has uploaded.
+        resp = self._request(
+            "POST",
+            f"{BASE_URL}/{page_id}/feed",
+            access_token=access_token,
+            json={
+                "message": content.text,
+                "attached_media": [{"media_fbid": photo_id} for photo_id in photo_ids],
+            },
+        )
+        data = resp.json()
+        post_id = data.get("id")
+        if not post_id:
+            raise PublishError(
+                "O Facebook não confirmou o ID da publicação com as fotos.",
+                platform=self.platform_name,
+                raw_response=data,
+            )
+        return PublishResult(
+            platform_post_id=post_id,
+            url=f"https://www.facebook.com/{post_id}",
+            extra={**data, "photo_ids": photo_ids},
         )
 
     def _publish_video(self, access_token: str, page_id: str, content: PublishContent) -> PublishResult:
