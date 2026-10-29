@@ -23,13 +23,12 @@ Context: media_attachments, post, workspace.
     {% endif %}
     <input type="hidden" name="media_ids" value="{{ attachment.media_asset.id }}">
     {% if post %}
-    <button type="button" class="remove-btn"
-            hx-post="{% url 'composer:remove_media' workspace_id=workspace.id post_id=post.id media_id=attachment.id %}"
-            hx-target="#media-list"
-            hx-swap="innerHTML">
+    <button type="button" class="remove-btn" aria-label="Remover mídia"
+            onclick="event.preventDefault(); event.stopPropagation(); removeComposerMedia(this)">
         <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
     </button>
     {% endif %}
+    {% include "composer/partials/media_order_controls.html" %}
 </div>
 {% empty %}
 <!-- No media attached yet - empty state handled by the dropzone -->

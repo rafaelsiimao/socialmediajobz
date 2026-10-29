@@ -592,14 +592,12 @@ def _sync_post_media(request, post, workspace):
 
     media_ids = [str(m).strip() for m in raw_media_ids if str(m).strip()]
 
-    # If no media_ids passed in form, fallback to pending session media
-    if not media_ids and pending_ids:
+    explicit_media = request.POST.get("media_submitted") == "1" or bool(raw_media_ids)
+    # The editor's complete list is authoritative, including an empty list.
+    # Legacy callers without a list may still attach pending uploads.
+    if not explicit_media and pending_ids:
         media_ids = list(pending_ids)
-
-    # Also append any new pending_ids that might have arrived during upload
-    for pid in pending_ids:
-        if pid not in media_ids:
-            media_ids.append(pid)
+    media_ids = list(dict.fromkeys(media_ids))
 
     if media_ids:
         assets_map = {
@@ -1134,6 +1132,7 @@ def preview(request, workspace_id):
         raw_media_ids = request.GET.getlist("pending_media_ids") or request.GET.getlist("pending_media_ids[]")
 
     client_media_ids = [str(m).strip() for m in raw_media_ids if str(m).strip()]
+    explicit_media = request.GET.get("media_submitted") == "1" or bool(raw_media_ids)
 
     if client_media_ids:
         assets_map = {
@@ -1152,7 +1151,7 @@ def preview(request, workspace_id):
                 )
 
     post_id_str = request.GET.get("_autosave_post_id", "")
-    if not media_items and post_id_str:
+    if not explicit_media and not media_items and post_id_str:
         try:
             post_obj = Post.objects.get(id=post_id_str, workspace=workspace)
             for att in post_obj.media_attachments.select_related("media_asset").order_by("position"):
@@ -1168,7 +1167,7 @@ def preview(request, workspace_id):
         except Post.DoesNotExist:
             pass
 
-    if not media_items:
+    if not explicit_media and not media_items:
         session_key = f"pending_media_{workspace.id}"
         pending_ids = [str(x) for x in request.session.get(session_key, []) if x]
         if pending_ids:

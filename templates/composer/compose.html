@@ -183,6 +183,14 @@
         z-index: 2;
     }
     .media-thumb .remove-btn:hover { background: #EF4444; }
+    .media-order-controls {
+        position: absolute; bottom: 0; left: 0; right: 0; z-index: 2;
+        display: flex; align-items: center; justify-content: space-between;
+        background: rgba(0, 0, 0, .7); color: white; font-size: 11px;
+    }
+    .media-order-controls button { min-width: 24px; min-height: 24px; cursor: pointer; }
+    .media-order-controls button:disabled { opacity: .3; cursor: default; }
+    .media-order-controls button:focus-visible { outline: 2px solid white; outline-offset: -2px; }
 
     /* Upload progress overlay */
     .media-thumb .upload-overlay {
@@ -1247,7 +1255,7 @@
         <input type="hidden" name="_autosave_post_id" :value="autosavedPostId" form="composer-form">
         <div id="autosave-trigger"
              hx-post="{% if post %}{% url 'composer:autosave_edit' workspace_id=workspace.id post_id=post.id %}{% else %}{% url 'composer:autosave' workspace_id=workspace.id %}{% endif %}"
-             hx-trigger="every 30s"
+             hx-trigger="every 30s, mediaChanged from:body delay:1s"
              hx-target="#autosave-status"
              hx-include="#composer-form"
              hx-swap="innerHTML"
@@ -1732,6 +1740,12 @@ function composerApp() {
             this.$nextTick(() => {
                 initMediaListSortable();
             });
+            document.body.addEventListener('htmx:afterSwap', (event) => {
+                if (event.detail.target?.id === 'media-list') {
+                    initMediaListSortable();
+                    composerMediaChanged();
+                }
+            });
 
             // Prevent autosave while uploads are pending or in progress
             const trigger = document.getElementById('autosave-trigger');
@@ -2054,38 +2068,45 @@ function getPreviewVals() {
         "caption": document.querySelector("[name=caption]")?.value || "",
         "selected_accounts": document.querySelector("[name=selected_accounts]")?.value || "",
         "_autosave_post_id": document.querySelector("[name=_autosave_post_id]")?.value || "",
-        "media_ids": mediaIds
+        "media_ids": mediaIds,
+        "media_submitted": "1"
     };
 }
 
 function initMediaListSortable() {
     const list = document.getElementById('media-list');
     if (!list) return;
-
-    let draggedItem = null;
+    updateMediaPositions();
 
     list.querySelectorAll('.media-thumb').forEach(thumb => {
         if (thumb.dataset.sortableInitialized === 'true') return;
         thumb.dataset.sortableInitialized = 'true';
         thumb.setAttribute('draggable', 'true');
+        thumb.querySelectorAll('img, video, button').forEach(el => el.setAttribute('draggable', 'false'));
 
         thumb.addEventListener('dragstart', (e) => {
-            draggedItem = thumb;
+            if (e.target.closest('button')) { e.preventDefault(); return; }
+            list._draggedItem = thumb;
             thumb.classList.add('opacity-40');
             e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', thumb.dataset.assetId || '');
         });
 
         thumb.addEventListener('dragend', () => {
-            if (draggedItem) {
-                draggedItem.classList.remove('opacity-40');
-                draggedItem = null;
+            if (list._draggedItem) {
+                list._draggedItem.classList.remove('opacity-40');
+                list._draggedItem = null;
             }
-            document.body.dispatchEvent(new CustomEvent('previewUpdate'));
+            composerMediaChanged();
         });
+
+        thumb.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); });
 
         thumb.addEventListener('dragover', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             e.dataTransfer.dropEffect = 'move';
+            const draggedItem = list._draggedItem;
             if (!draggedItem || draggedItem === thumb) return;
 
             const rect = thumb.getBoundingClientRect();
@@ -2099,23 +2120,39 @@ function initMediaListSortable() {
     });
 }
 
-async function removePendingMedia(assetId, url, btn) {
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
-        || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-    try {
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'X-CSRFToken': csrfToken },
-        });
-        if (resp.ok) {
-            const html = await resp.text();
-            document.getElementById('media-list').innerHTML = html;
-            initMediaListSortable();
-            document.body.dispatchEvent(new CustomEvent('previewUpdate'));
+function updateMediaPositions() {
+    const thumbs = Array.from(document.querySelectorAll('#media-list .media-thumb[data-asset-id]'));
+    thumbs.forEach((thumb, index) => {
+        const position = thumb.querySelector('.media-position');
+        if (position) position.textContent = index + 1;
+        const buttons = thumb.querySelectorAll('.media-order-controls button');
+        if (buttons.length === 2) {
+            buttons[0].disabled = index === 0;
+            buttons[1].disabled = index === thumbs.length - 1;
         }
-    } catch (err) {
-        console.error('Remove failed:', err);
-    }
+    });
+}
+
+function composerMediaChanged() {
+    updateMediaPositions();
+    document.body.dispatchEvent(new CustomEvent('previewUpdate'));
+    document.body.dispatchEvent(new CustomEvent('mediaChanged'));
+}
+
+function moveComposerMedia(btn, direction) {
+    const thumb = btn.closest('.media-thumb');
+    const list = thumb.parentElement;
+    const thumbs = Array.from(list.querySelectorAll('.media-thumb[data-asset-id]'));
+    const neighbor = thumbs[thumbs.indexOf(thumb) + direction];
+    if (!neighbor) return;
+    list.insertBefore(thumb, direction < 0 ? neighbor : neighbor.nextSibling);
+    composerMediaChanged();
+}
+
+function removeComposerMedia(btn) {
+    // Detach from this draft; keep the original available in the media library.
+    btn.closest('.media-thumb').remove();
+    composerMediaChanged();
 }
 
 /* ── Publish Split-Button (vanilla JS) ────────────────────────── */
