@@ -1,4 +1,23 @@
-/* Instagram feed-specific checks. Reel/Story and other networks retain their upload flow. */
+/* Composer media checks; each network retains its own supported combinations. */
+const LINKEDIN_MEDIA_ERROR = 'O LinkedIn aceita várias fotos ou um vídeo por publicação. Separe os vídeos das outras mídias.';
+
+function getLinkedInMediaError() {
+    const list = document.getElementById('media-list');
+    if (list?.dataset.linkedinSelected !== 'true') return '';
+    const items = Array.from(list.querySelectorAll('.media-thumb[data-asset-id]'));
+    return items.length > 1 && items.some(item => item.querySelector('video')) ? LINKEDIN_MEDIA_ERROR : '';
+}
+
+function getComposerMediaError() {
+    return getLinkedInMediaError() || getInstagramMediaError();
+}
+
+function setLinkedInMediaEnabled(enabled) {
+    const list = document.getElementById('media-list');
+    if (list) list.dataset.linkedinSelected = enabled ? 'true' : 'false';
+    refreshInstagramMediaError();
+}
+
 function getInstagramMediaError() {
     const list = document.getElementById('media-list');
     if (list?.dataset.instagramCarousel !== 'true') return '';
@@ -20,7 +39,7 @@ function getInstagramMediaError() {
 function refreshInstagramMediaError() {
     const warning = document.getElementById('carousel-media-error');
     if (!warning) return;
-    warning.textContent = getInstagramMediaError();
+    warning.textContent = getComposerMediaError();
     warning.hidden = !warning.textContent;
 }
 

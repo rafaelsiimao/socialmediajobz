@@ -107,7 +107,9 @@ def _instagram_formats(request, workspace, collaborators=None):
     }
     validate_story_selection(accounts, effective)
     from .instagram_media import validate_instagram_media_selection
+    from .linkedin_media import validate_linkedin_media_selection
 
+    validate_linkedin_media_selection(request, workspace, accounts, post_id)
     validate_instagram_media_selection(request, workspace, accounts, effective, post_id)
     for acc_id, fmt in effective.items():
         if fmt == "story" and (collaborators or {}).get(acc_id):

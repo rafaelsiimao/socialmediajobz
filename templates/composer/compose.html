@@ -311,7 +311,7 @@
 {% block content %}
 <div class="composer-main flex flex-col flex-1"
      x-data="composerApp()"
-     x-effect="if (!hasStoryConflict && formError === storyConflictMessage) formError = ''; setInstagramCarouselEnabled(!isStoryMode && selectedAccounts.some(id => ['instagram', 'instagram_personal'].includes(charLimits[id]?.platform) && (instagramFormats[id] || 'feed') === 'feed'), supportsMixedUploads)"
+     x-effect="if (!hasStoryConflict && formError === storyConflictMessage) formError = ''; setLinkedInMediaEnabled(selectedAccounts.some(id => ['linkedin_personal', 'linkedin_company'].includes(charLimits[id]?.platform))); setInstagramCarouselEnabled(!isStoryMode && selectedAccounts.some(id => ['instagram', 'instagram_personal'].includes(charLimits[id]?.platform) && (instagramFormats[id] || 'feed') === 'feed'), supportsMixedUploads)"
      @ig-format-change.window="instagramFormats = { ...instagramFormats, [$event.detail.account]: $event.detail.value }"
      @keydown.meta.s.prevent="saveDraft()"
      @keydown.ctrl.s.prevent="saveDraft()">
@@ -346,8 +346,8 @@
         <form id="composer-form"
               hx-post="{% if post %}{% url 'composer:save_post_edit' workspace_id=workspace.id post_id=post.id %}{% else %}{% url 'composer:save_post' workspace_id=workspace.id %}{% endif %}"
               hx-swap="none"
-              @submit="if (hasStoryConflict || isCheckingFiles || getInstagramMediaError()) { $event.preventDefault(); if (hasStoryConflict) formError = storyConflictMessage; }"
-              @htmx:before-request="if ($event.detail.elt === $el && (hasStoryConflict || isCheckingFiles || getInstagramMediaError())) { $event.preventDefault(); if (hasStoryConflict) formError = storyConflictMessage; }"
+              @submit="if (hasStoryConflict || isCheckingFiles || getComposerMediaError()) { $event.preventDefault(); if (hasStoryConflict) formError = storyConflictMessage; }"
+              @htmx:before-request="if ($event.detail.elt === $el && (hasStoryConflict || isCheckingFiles || getComposerMediaError())) { $event.preventDefault(); if (hasStoryConflict) formError = storyConflictMessage; }"
               @htmx:after-request="onFormSaved($event)"
               class="flex flex-col flex-1 min-h-0">
             <input type="hidden" name="selected_accounts" :value="selectedAccounts.join(',')">
@@ -1631,7 +1631,7 @@ function composerApp() {
         openApprovalModal(actionType) {
             if (this.selectedAccounts.length === 0) return;
             if (this.hasStoryConflict) { this.formError = this.storyConflictMessage; return; }
-            if (this.isCheckingFiles || getInstagramMediaError()) return;
+            if (this.isCheckingFiles || getComposerMediaError()) return;
             this.approvalMode = actionType === 'external_approval' ? 'external' : 'internal';
             this.approvalError = '';
             this.approvalActionType = actionType;
@@ -1802,7 +1802,7 @@ function composerApp() {
             const trigger = document.getElementById('autosave-trigger');
             if (trigger) {
                 trigger.addEventListener('htmx:configRequest', (evt) => {
-                    if (this.hasStoryConflict || this.isCheckingFiles || getInstagramMediaError() || this.isUploading || (this.uploadQueue && this.uploadQueue.length > 0)) {
+                    if (this.hasStoryConflict || this.isCheckingFiles || getComposerMediaError() || this.isUploading || (this.uploadQueue && this.uploadQueue.length > 0)) {
                         evt.preventDefault();
                     }
                 });
@@ -1965,6 +1965,13 @@ function composerApp() {
                 ['instagram', 'instagram_personal'].includes(this.charLimits[id]?.platform)
                 && (this.instagramFormats[id] || 'feed') === 'feed');
             const currentMediaCount = document.querySelectorAll('#media-list .media-thumb').length + this.uploadQueue.length;
+            const linkedinSelected = this.selectedAccounts.some(id =>
+                ['linkedin_personal', 'linkedin_company'].includes(this.charLimits[id]?.platform));
+            if (linkedinSelected && currentMediaCount + files.length > 1
+                && (videos.length || this.uploadQueue.some(file => file.type.startsWith('video/')) || document.querySelector('#media-list video'))) {
+                this.formError = LINKEDIN_MEDIA_ERROR;
+                return;
+            }
             if (instagramFeed && !this.supportsMixedUploads && currentMediaCount + files.length > 1
                 && (videos.length || document.querySelector('#media-list video'))) {
                 this.formError = 'Para usar fotos e vídeos no mesmo carrossel, selecione apenas Instagram no formato Post.';

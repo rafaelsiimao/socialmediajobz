@@ -1,5 +1,35 @@
 # LinkedIn: várias fotos e legenda — 29/10/2026
 
+## Proteção contra vídeo com outros anexos — 29/10/2026
+
+Corrigido também o descarte silencioso quando o primeiro anexo era vídeo:
+o provider escolhia somente o primeiro arquivo. Personal e Company agora validam
+o conjunto antes de consultar o perfil ou iniciar uploads. A regra é várias fotos
+ou um vídeo por publicação; conjuntos com vídeo e outro anexo retornam erro.
+Uma foto, várias fotos e um vídeo individual mantêm os fluxos existentes.
+
+O editor avisa e impede upload adicional incompatível, salvamento, autosave e
+abertura do envio para aprovação enquanto o conjunto for inválido. Trocar canais
+ou remover anexos recalcula o aviso. O servidor verifica os tipos reais dos
+MediaAssets do workspace antes de criar/alterar/agendar o post, incluindo mídias
+pendentes na sessão, IDs explícitos e anexos já salvos. Lista explícita vazia
+permite remover todos os anexos, sem recuperar os anteriores da sessão.
+
+O worker é protegido pelo provider também para publicações antigas já agendadas:
+recusa antes da API e registra erro conforme a política de retentativas existente,
+preservando arquivos e legenda. Não limpa automaticamente anexos ou posts antigos.
+Rafael deve editar conjuntos antigos incompatíveis e separar os vídeos.
+
+Testes simulam HTTP; nenhum post real é publicado. Browser local testa aviso nos
+dois conectores, bloqueio de save/upload e recuperação após remoção. Não altera
+OAuth, credenciais, métricas, renovação de tokens ou saúde da Company Page.
+Implantar web + worker, Ctrl+F5. Sem migração ou ambiente novo.
+
+Testes novos: tests/test_linkedin_media_selection.py,
+tests/test_linkedin_publish_dispatch.py, tests/providers/test_linkedin_publishing.py
+e tests/browser/linkedin-media.cjs. Regressões incluem Facebook, fila,
+Instagram misto, Stories, Reels e aprovação externa.
+
 ## Problema relatado e causa encontrada
 
 Rafael confirmou que posts com várias fotos publicavam só a primeira e que a

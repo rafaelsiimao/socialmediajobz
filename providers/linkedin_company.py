@@ -160,6 +160,7 @@ class LinkedInCompanyProvider(LinkedInProvider):
 
     def publish_post(self, access_token: str, content: PublishContent) -> PublishResult:
         """Publish on behalf of the organization."""
+        self._validate_media(content)
         author = content.extra.get("author")
         page_id = content.extra.get("page_id")
         if not author:

@@ -141,3 +141,51 @@ def test_mixed_image_video_is_not_uploaded_as_a_photo_carousel(linkedin):
             ),
         )
     request.assert_not_called()
+
+
+@pytest.mark.parametrize("local", [False, True])
+@pytest.mark.parametrize("tail", ["photo.jpg", "second.mp4"])
+@pytest.mark.parametrize("author", [None, "urn:li:organization:123"])
+def test_video_first_never_drops_remaining_attachments(linkedin, local, tail, author):
+    sources = ["https://example.com/first.mp4", f"https://example.com/{tail}"]
+    with (
+        patch.object(linkedin, "_request") as request,
+        patch.object(linkedin, "_upload_binary") as upload,
+        patch.object(linkedin, "get_profile") as profile,
+        pytest.raises(PublishError, match="um vídeo"),
+    ):
+        linkedin.publish_post(
+            "fake-token",
+            PublishContent(
+                post_type=PostType.VIDEO,
+                media_files=sources if local else [],
+                media_urls=sources,
+                extra={"author": author} if author else {},
+            ),
+        )
+    request.assert_not_called()
+    upload.assert_not_called()
+    profile.assert_not_called()
+
+
+def test_single_video_still_uploads_with_complete_caption(linkedin):
+    responses = [
+        MagicMock(json=lambda: {"value": {"uploadUrl": "https://upload.example/video", "video": "urn:li:video:1"}}),
+        MagicMock(headers={"x-restli-id": "urn:li:share:123"}),
+    ]
+    with (
+        patch.object(linkedin, "_request", side_effect=responses) as request,
+        patch.object(linkedin, "_upload_binary") as upload,
+    ):
+        linkedin.publish_post(
+            "fake-token",
+            PublishContent(
+                text="Legenda completa",
+                post_type=PostType.VIDEO,
+                media_urls=["https://example.com/video.mp4"],
+                extra={"author": "urn:li:organization:123"},
+            ),
+        )
+    upload.assert_called_once()
+    assert request.call_args.kwargs["json"]["content"] == {"media": {"id": "urn:li:video:1"}}
+    assert request.call_args.kwargs["json"]["commentary"] == "Legenda completa"

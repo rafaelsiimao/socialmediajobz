@@ -31,6 +31,7 @@ AUTH_URL = "https://www.linkedin.com/oauth/v2/authorization"
 TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
 REVOKE_URL = "https://www.linkedin.com/oauth/v2/revoke"
 API_BASE = "https://api.linkedin.com"
+LINKEDIN_MEDIA_ERROR = "O LinkedIn aceita várias fotos ou um vídeo por publicação. Separe os vídeos das outras mídias."
 
 # Required headers for LinkedIn REST API
 LINKEDIN_HEADERS = {
@@ -193,6 +194,7 @@ class LinkedInProvider(SocialProvider):
     # ------------------------------------------------------------------
 
     def publish_post(self, access_token: str, content: PublishContent) -> PublishResult:
+        self._validate_media(content)
         author = content.extra.get("author")
         if not author:
             # Derive from profile
@@ -208,6 +210,14 @@ class LinkedInProvider(SocialProvider):
         if content.post_type == PostType.POLL:
             return self._publish_poll_post(access_token, author, content)
         return self._publish_text_post(access_token, author, content)
+
+    def _validate_media(self, content: PublishContent):
+        sources = content.media_files or content.media_urls
+        if len(sources) > 1 and (
+            content.post_type == PostType.VIDEO
+            or any(urlsplit(source).path.lower().endswith((".mp4", ".mov", ".webm", ".avi", ".m4v")) for source in sources)
+        ):
+            raise PublishError(LINKEDIN_MEDIA_ERROR, platform=self.platform_name)
 
     def _build_post_body(self, author: str, commentary: str) -> dict:
         # Posts API parses `commentary` as LinkedIn little text, not plain text.
