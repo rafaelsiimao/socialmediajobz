@@ -40,6 +40,35 @@ const { chromium } = require('playwright');
         await page.goto('http://carousel.local/editor/');
         await page.waitForFunction(() => window.Alpine && document.querySelector('[name=caption]')?._x_model);
         const ids = () => page.locator('#media-list input[name=media_ids]').evaluateAll(inputs => inputs.map(i => i.value));
+        // Framing follows slide 1, compares ratios (not pixel sizes), and never blocks saving.
+        await page.evaluate(() => {
+            const thumbs = document.querySelectorAll('#media-list .media-thumb');
+            [[800, 1000], [1600, 2000], [1600, 900]].forEach(([width, height], i) => {
+                thumbs[i].dataset.width = width;
+                thumbs[i].dataset.height = height;
+            });
+            updateInstagramCarouselFraming();
+        });
+        const warning = page.locator('#carousel-crop-warning');
+        await warning.waitFor({ state: 'visible' });
+        assert.equal(await page.locator('#media-list .media-crop-warning').count(), 1);
+        assert.equal(await page.locator('#media-list .media-crop-warning').getAttribute('data-asset-id'), fixture.mediaIds[2]);
+        assert.equal(await page.locator('#media-list .media-crop-warning').evaluate(el => getComputedStyle(el).borderColor), 'rgb(220, 38, 38)');
+        await page.locator('#media-list .media-thumb').nth(2).getByRole('button', { name: 'Mover para a esquerda' }).click();
+        await page.locator('#media-list .media-thumb').nth(1).getByRole('button', { name: 'Mover para a esquerda' }).click();
+        assert.equal(await page.locator('#media-list .media-crop-warning').count(), 2);
+        assert.equal(await page.locator('#media-list .media-thumb').first().evaluate(el => el.classList.contains('media-crop-warning')), false);
+        const frame = await page.locator('#media-list .media-thumb').first().evaluate(el => ({ width: el.offsetWidth, height: el.offsetHeight }));
+        assert.ok(Math.abs(frame.width / frame.height - 1600 / 900) < .05);
+        // Story and non-Instagram selections must not inherit feed crop warnings.
+        await page.locator('input[name^="ig_format_"][value="story"]').first().locator('..').click();
+        await warning.waitFor({ state: 'hidden' });
+        assert.equal(await page.locator('#media-list .media-crop-warning').count(), 0);
+        await page.locator('input[name^="ig_format_"][value="feed"]').first().locator('..').click();
+        await warning.waitFor({ state: 'visible' });
+        await page.locator('#media-list .media-thumb').first().getByRole('button', { name: 'Mover para a direita' }).click();
+        await page.locator('#media-list .media-thumb').nth(1).getByRole('button', { name: 'Mover para a direita' }).click();
+        assert.deepEqual(await ids(), fixture.mediaIds);
         // Mimic successive upload responses: old nodes already initialized, new node inserted later.
         await page.evaluate(() => {
             const list = document.getElementById('media-list');

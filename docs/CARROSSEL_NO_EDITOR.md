@@ -5,6 +5,31 @@ indica a ordem do carrossel. O X remove a mídia desta publicação, preservando
 arquivo original na biblioteca. A prévia atualiza e as mudanças disparam o
 salvamento automático após um segundo; Salvar Rascunho continua disponível.
 
+## Proporções diferentes — 29/10/2026
+
+Para carrosséis de fotos no feed do Instagram, a capa define o enquadramento.
+O editor compara proporções, não tamanho em pixels: duas imagens 800×1000 e
+1600×2000 são equivalentes. Diferenças menores que 1% são tratadas como
+arredondamento. Usa dimensões salvas ou, quando faltam, as dimensões da imagem
+original carregada pelo navegador; não usa uma miniatura quadrada como referência.
+
+Fotos afetadas recebem borda vermelha, etiqueta Recorte e uma explicação. Todas
+as miniaturas assumem o quadro da capa e exibem recorte central; a prévia de feed
+já usa a primeira foto com `object-fit: cover`. Reordenar, remover a capa ou
+adicionar fotos recalcula a indicação. O aviso não impede salvar/publicar.
+
+O enquadramento segue os limites atuais da prévia (4:5 a 1,91:1). Stories,
+Reels, uma única foto, seleções sem Instagram e carrosséis contendo vídeo não
+ativam esse aviso de carrossel fotográfico. Vale para os dois conectores IG.
+Os arquivos originais não são alterados: o envio continua usando a API existente,
+que aplica seu enquadramento na publicação. Esta mudança é no editor, sem nova
+opção de publicação manual e sem alterações em LinkedIn ou Insights.
+
+Conferidos 27 testes Python e navegador isolado: mesma proporção em resoluções
+diferentes não alerta; proporção diferente fica vermelha; troca da capa altera
+as marcações e o quadro; Story desativa e feed reativa o aviso; ordenação,
+remoção e autosave continuam funcionando. Implantar somente web e Ctrl+F5.
+
 ## Causas corrigidas
 
 - Miniaturas de uploads inseridas por XMLHttpRequest não inicializavam os

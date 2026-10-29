@@ -173,6 +173,17 @@
         border: 1px solid #E7E5E4;
     }
     .media-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .media-thumb.media-crop-warning { border: 3px solid #DC2626; }
+    .media-thumb.media-crop-warning::after {
+        content: 'Recorte'; position: absolute; top: 0; left: 0;
+        background: #DC2626; color: white; font-size: 10px; padding: 1px 3px;
+        pointer-events: none;
+    }
+    #carousel-crop-warning {
+        margin: 0 16px 10px; padding: 10px 12px; border-radius: 8px;
+        background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B;
+        font-size: 12px; line-height: 1.5;
+    }
     .media-thumb .remove-btn {
         position: absolute; top: 3px; right: 3px;
         width: 18px; height: 18px; border-radius: 50%;
@@ -272,7 +283,7 @@
 {% block content %}
 <div class="composer-main flex flex-col flex-1"
      x-data="composerApp()"
-     x-effect="if (!hasStoryConflict && formError === storyConflictMessage) formError = ''"
+     x-effect="if (!hasStoryConflict && formError === storyConflictMessage) formError = ''; setInstagramCarouselEnabled(!isStoryMode && selectedAccounts.some(id => ['instagram', 'instagram_personal'].includes(charLimits[id]?.platform) && (instagramFormats[id] || 'feed') === 'feed'))"
      @ig-format-change.window="instagramFormats = { ...instagramFormats, [$event.detail.account]: $event.detail.value }"
      @keydown.meta.s.prevent="saveDraft()"
      @keydown.ctrl.s.prevent="saveDraft()">
@@ -477,6 +488,12 @@
                                 {% include "composer/partials/media_list_pending.html" %}
                             {% endif %}
                         </div>
+                        <p id="carousel-crop-warning" role="status" aria-live="polite" hidden>
+                            A primeira foto (capa) define o formato do carrossel no Instagram.
+                            As fotos em vermelho têm proporções diferentes e terão recorte central
+                            para acompanhar a capa. Confira a prévia antes de publicar.
+                            Você pode continuar ou mudar a primeira foto.
+                        </p>
 
                         <!-- Inline media dropzone -->
                         <input type="file" x-ref="fileInput" class="hidden" multiple
@@ -2083,6 +2100,7 @@ function initMediaListSortable() {
         thumb.dataset.sortableInitialized = 'true';
         thumb.setAttribute('draggable', 'true');
         thumb.querySelectorAll('img, video, button').forEach(el => el.setAttribute('draggable', 'false'));
+        thumb.querySelector('img')?.addEventListener('load', updateInstagramCarouselFraming);
 
         thumb.addEventListener('dragstart', (e) => {
             if (e.target.closest('button')) { e.preventDefault(); return; }
@@ -2131,6 +2149,51 @@ function updateMediaPositions() {
             buttons[1].disabled = index === thumbs.length - 1;
         }
     });
+    updateInstagramCarouselFraming();
+}
+
+function setInstagramCarouselEnabled(enabled) {
+    const list = document.getElementById('media-list');
+    if (!list) return;
+    list.dataset.instagramCarousel = enabled ? 'true' : 'false';
+    updateInstagramCarouselFraming();
+}
+
+function updateInstagramCarouselFraming() {
+    const list = document.getElementById('media-list');
+    if (!list) return;
+    const thumbs = Array.from(list.querySelectorAll('.media-thumb[data-asset-id]'));
+    const enabled = list.dataset.instagramCarousel === 'true' && thumbs.length > 1
+        && thumbs.every(thumb => thumb.querySelector('img'));
+    const ratioOf = thumb => {
+        const img = thumb.querySelector('img');
+        const width = Number(thumb.dataset.width) || img?.naturalWidth;
+        const height = Number(thumb.dataset.height) || img?.naturalHeight;
+        return width > 0 && height > 0 ? width / height : null;
+    };
+    const coverRatio = enabled ? ratioOf(thumbs[0]) : null;
+    // Match the existing Instagram feed preview's supported frame range.
+    const frameRatio = coverRatio ? Math.min(1.91, Math.max(.8, coverRatio)) : null;
+    let croppedCount = 0;
+    thumbs.forEach(thumb => {
+        const ratio = ratioOf(thumb);
+        // Ignore rounding differences below 1% (e.g. two exports of the same format).
+        const cropped = !!(frameRatio && ratio && Math.abs(ratio / frameRatio - 1) > .01);
+        thumb.classList.toggle('media-crop-warning', cropped);
+        if (cropped) {
+            croppedCount++;
+            thumb.title = 'Recorte central para acompanhar a primeira foto do carrossel.';
+            thumb.setAttribute('aria-describedby', 'carousel-crop-warning');
+        } else {
+            thumb.removeAttribute('title');
+            thumb.removeAttribute('aria-describedby');
+        }
+        // Show the same cover frame and center crop used by the feed preview.
+        thumb.style.width = frameRatio ? '80px' : '';
+        thumb.style.height = frameRatio ? `${80 / frameRatio}px` : '';
+    });
+    const warning = document.getElementById('carousel-crop-warning');
+    if (warning) warning.hidden = croppedCount === 0;
 }
 
 function composerMediaChanged() {
