@@ -255,6 +255,17 @@ def extract_video_metadata(file_path):
             if stream.get("codec_type") == "video":
                 metadata["width"] = stream.get("width")
                 metadata["height"] = stream.get("height")
+                # Phone videos often store landscape pixels with a portrait
+                # display matrix. Match the orientation shown by the browser.
+                rotation = next(
+                    (item["rotation"] for item in stream.get("side_data_list", []) if "rotation" in item),
+                    stream.get("tags", {}).get("rotate", 0),
+                )
+                try:
+                    if abs(float(rotation)) % 180 == 90:
+                        metadata["width"], metadata["height"] = metadata["height"], metadata["width"]
+                except (TypeError, ValueError):
+                    pass
                 break
 
         return metadata

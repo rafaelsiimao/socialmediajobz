@@ -46,8 +46,17 @@ def crop_media(request, workspace_id, asset_id):
             raise ValueError("Recorte inválido.")
         x, y, width, height = [round(value) for value in values]
         image = _read_photo(source)
-        cover_image = image if cover.pk == source.pk else _read_photo(cover)
-        ratio = min(1.91, max(.8, cover_image.width / cover_image.height))
+        if cover.is_video:
+            from .instagram_media import populate_video_metadata
+
+            populate_video_metadata(cover)
+            if not cover.width or not cover.height:
+                raise ValueError("Aguarde a leitura das dimensões do vídeo da capa.")
+            ratio = cover.width / cover.height
+        else:
+            cover_image = image if cover.pk == source.pk else _read_photo(cover)
+            ratio = cover_image.width / cover_image.height
+        ratio = min(1.91, max(.8, ratio))
         if x < 0 or y < 0 or width < 16 or height < 16:
             raise ValueError("Escolha uma área maior dentro da foto.")
         if x + width > image.width + 1 or y + height > image.height + 1:

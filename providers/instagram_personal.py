@@ -236,6 +236,8 @@ class InstagramPersonalProvider(SocialProvider):
     # ------------------------------------------------------------------
 
     def publish_post(self, access_token: str, content: PublishContent) -> PublishResult:
+        if content.post_type == PostType.CAROUSEL and not 2 <= len(content.media_urls) <= 10:
+            raise PublishError("O carrossel do Instagram aceita de 2 a 10 fotos e vídeos.", platform=self.platform_name)
         if not content.media_urls:
             raise PublishError(
                 "Instagram requires at least one media item",

@@ -180,7 +180,7 @@
         background: #DC2626; color: white; font-size: 10px; padding: 1px 3px;
         pointer-events: none;
     }
-    #carousel-crop-warning {
+    #carousel-crop-warning, #carousel-media-error {
         margin: 0 16px 10px; padding: 10px 12px; border-radius: 8px;
         background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B;
         font-size: 12px; line-height: 1.5;
@@ -311,7 +311,7 @@
 {% block content %}
 <div class="composer-main flex flex-col flex-1"
      x-data="composerApp()"
-     x-effect="if (!hasStoryConflict && formError === storyConflictMessage) formError = ''; setInstagramCarouselEnabled(!isStoryMode && selectedAccounts.some(id => ['instagram', 'instagram_personal'].includes(charLimits[id]?.platform) && (instagramFormats[id] || 'feed') === 'feed'))"
+     x-effect="if (!hasStoryConflict && formError === storyConflictMessage) formError = ''; setInstagramCarouselEnabled(!isStoryMode && selectedAccounts.some(id => ['instagram', 'instagram_personal'].includes(charLimits[id]?.platform) && (instagramFormats[id] || 'feed') === 'feed'), supportsMixedUploads)"
      @ig-format-change.window="instagramFormats = { ...instagramFormats, [$event.detail.account]: $event.detail.value }"
      @keydown.meta.s.prevent="saveDraft()"
      @keydown.ctrl.s.prevent="saveDraft()">
@@ -346,8 +346,8 @@
         <form id="composer-form"
               hx-post="{% if post %}{% url 'composer:save_post_edit' workspace_id=workspace.id post_id=post.id %}{% else %}{% url 'composer:save_post' workspace_id=workspace.id %}{% endif %}"
               hx-swap="none"
-              @submit="if (hasStoryConflict) { $event.preventDefault(); formError = storyConflictMessage; }"
-              @htmx:before-request="if ($event.detail.elt === $el && hasStoryConflict) { $event.preventDefault(); formError = storyConflictMessage; }"
+              @submit="if (hasStoryConflict || isCheckingFiles || getInstagramMediaError()) { $event.preventDefault(); if (hasStoryConflict) formError = storyConflictMessage; }"
+              @htmx:before-request="if ($event.detail.elt === $el && (hasStoryConflict || isCheckingFiles || getInstagramMediaError())) { $event.preventDefault(); if (hasStoryConflict) formError = storyConflictMessage; }"
               @htmx:after-request="onFormSaved($event)"
               class="flex flex-col flex-1 min-h-0">
             <input type="hidden" name="selected_accounts" :value="selectedAccounts.join(',')">
@@ -517,11 +517,12 @@
                             {% endif %}
                         </div>
                         <p id="carousel-crop-warning" role="status" aria-live="polite" hidden>
-                            A primeira foto (capa) define o formato do carrossel no Instagram.
-                            As fotos em vermelho têm proporções diferentes e terão recorte central
+                            A primeira mídia (capa) define o formato do carrossel no Instagram.
+                            As mídias em vermelho têm proporções diferentes e terão recorte central
                             para acompanhar a capa. Confira a prévia antes de publicar.
-                            Você pode continuar ou mudar a primeira foto.
+                            Você pode continuar ou mudar a capa. O ajuste manual de recorte é para fotos.
                         </p>
+                        <p id="carousel-media-error" role="alert" hidden></p>
 
                         <!-- Inline media dropzone -->
                         <input type="file" x-ref="fileInput" class="hidden" multiple
@@ -1591,6 +1592,7 @@
 
 {% block extra_js %}
 <script src="{% static 'js/vendor/cropper.min.js' %}"></script>
+<script src="{% static 'js/composer-media.js' %}"></script>
 <script src="{% static 'js/composer-crop.js' %}"></script>
 <script>
 function composerApp() {
@@ -1629,6 +1631,7 @@ function composerApp() {
         openApprovalModal(actionType) {
             if (this.selectedAccounts.length === 0) return;
             if (this.hasStoryConflict) { this.formError = this.storyConflictMessage; return; }
+            if (this.isCheckingFiles || getInstagramMediaError()) return;
             this.approvalMode = actionType === 'external_approval' ? 'external' : 'internal';
             this.approvalError = '';
             this.approvalActionType = actionType;
@@ -1799,7 +1802,7 @@ function composerApp() {
             const trigger = document.getElementById('autosave-trigger');
             if (trigger) {
                 trigger.addEventListener('htmx:configRequest', (evt) => {
-                    if (this.hasStoryConflict || this.isUploading || (this.uploadQueue && this.uploadQueue.length > 0)) {
+                    if (this.hasStoryConflict || this.isCheckingFiles || getInstagramMediaError() || this.isUploading || (this.uploadQueue && this.uploadQueue.length > 0)) {
                         evt.preventDefault();
                     }
                 });
@@ -1944,17 +1947,53 @@ function composerApp() {
 
         uploadQueue: [],
         isUploading: false,
+        isCheckingFiles: false,
 
-        processFiles(files) {
+        get supportsMixedUploads() {
+            return this.selectedAccounts.length > 0 && this.selectedAccounts.every(id =>
+                ['instagram', 'instagram_personal'].includes(this.charLimits[id]?.platform)
+                && (this.instagramFormats[id] || 'feed') === 'feed');
+        },
+
+        async processFiles(files) {
             const videos = files.filter(f => f.type.startsWith('video/'));
             const images = files.filter(f => f.type.startsWith('image/'));
 
-            if (videos.length > 1) {
+            if (this.isCheckingFiles) return;
+            this.formError = '';
+            const instagramFeed = this.selectedAccounts.some(id =>
+                ['instagram', 'instagram_personal'].includes(this.charLimits[id]?.platform)
+                && (this.instagramFormats[id] || 'feed') === 'feed');
+            const currentMediaCount = document.querySelectorAll('#media-list .media-thumb').length + this.uploadQueue.length;
+            if (instagramFeed && !this.supportsMixedUploads && currentMediaCount + files.length > 1
+                && (videos.length || document.querySelector('#media-list video'))) {
+                this.formError = 'Para usar fotos e vídeos no mesmo carrossel, selecione apenas Instagram no formato Post.';
+                return;
+            }
+            if (this.supportsMixedUploads) {
+                const total = currentMediaCount + files.length;
+                if (total > 10) { this.formError = 'O carrossel do Instagram aceita até 10 fotos e vídeos no total.'; return; }
+                this.isCheckingFiles = true;
+                try {
+                    for (const file of videos) {
+                        if (!/\.(mp4|mov)$/i.test(file.name)) throw new Error('Use vídeos MP4 ou MOV no carrossel.');
+                        const metadata = await readComposerVideoMetadata(file);
+                        if (total > 1 && metadata.duration > 60) throw new Error('Cada vídeo do carrossel aceita até 60 segundos.');
+                    }
+                    if (total > 1) {
+                        for (const video of document.querySelectorAll('#media-list video')) {
+                            const duration = Number(video.closest('.media-thumb').dataset.duration) || video.duration;
+                            if (Number.isFinite(duration) && duration > 60) throw new Error('Cada vídeo do carrossel aceita até 60 segundos.');
+                        }
+                    }
+                } catch (error) { this.formError = error.message; return; }
+                finally { this.isCheckingFiles = false; }
+            } else if (videos.length > 1) {
                 alert('Apenas um arquivo de vídeo pode ser enviado por vez.');
                 return;
             }
 
-            if (videos.length === 1 && images.length > 0) {
+            if (!this.supportsMixedUploads && videos.length === 1 && images.length > 0) {
                 alert('Não é possível misturar imagens e vídeo. Envie imagens ou um único vídeo.');
                 return;
             }
@@ -2023,6 +2062,7 @@ function composerApp() {
             const self = this;
             const formData = new FormData();
             formData.append('file', file);
+            if (this.supportsMixedUploads && file.type.startsWith('video/')) formData.append('inspect_video', '1');
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
                 || document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
 
@@ -2132,6 +2172,7 @@ function initMediaListSortable() {
         thumb.setAttribute('draggable', 'true');
         thumb.querySelectorAll('img, video, button').forEach(el => el.setAttribute('draggable', 'false'));
         thumb.querySelector('img')?.addEventListener('load', updateInstagramCarouselFraming);
+        thumb.querySelector('video')?.addEventListener('loadedmetadata', updateInstagramCarouselFraming);
 
         thumb.addEventListener('dragstart', (e) => {
             if (e.target.closest('button')) { e.preventDefault(); return; }
@@ -2183,10 +2224,11 @@ function updateMediaPositions() {
     updateInstagramCarouselFraming();
 }
 
-function setInstagramCarouselEnabled(enabled) {
+function setInstagramCarouselEnabled(enabled, mixedAllowed = true) {
     const list = document.getElementById('media-list');
     if (!list) return;
     list.dataset.instagramCarousel = enabled ? 'true' : 'false';
+    list.dataset.mixedAllowed = mixedAllowed ? 'true' : 'false';
     updateInstagramCarouselFraming();
 }
 
@@ -2195,11 +2237,11 @@ function updateInstagramCarouselFraming() {
     if (!list) return;
     const thumbs = Array.from(list.querySelectorAll('.media-thumb[data-asset-id]'));
     const enabled = list.dataset.instagramCarousel === 'true' && thumbs.length > 1
-        && thumbs.every(thumb => thumb.querySelector('img'));
+        && thumbs.every(thumb => thumb.querySelector('img, video'));
     const ratioOf = thumb => {
-        const img = thumb.querySelector('img');
-        const width = Number(thumb.dataset.width) || img?.naturalWidth;
-        const height = Number(thumb.dataset.height) || img?.naturalHeight;
+        const img = thumb.querySelector('img, video');
+        const width = Number(thumb.dataset.width) || img?.naturalWidth || img?.videoWidth;
+        const height = Number(thumb.dataset.height) || img?.naturalHeight || img?.videoHeight;
         return width > 0 && height > 0 ? width / height : null;
     };
     const coverRatio = enabled ? ratioOf(thumbs[0]) : null;
@@ -2211,7 +2253,7 @@ function updateInstagramCarouselFraming() {
         // Ignore rounding differences below 1% (e.g. two exports of the same format).
         const cropped = !!(frameRatio && ratio && Math.abs(ratio / frameRatio - 1) > .01);
         thumb.classList.toggle('media-crop-warning', cropped);
-        thumb.classList.toggle('instagram-carousel-photo', !!frameRatio);
+        thumb.classList.toggle('instagram-carousel-photo', !!frameRatio && !!thumb.querySelector('img'));
         if (cropped) {
             croppedCount++;
             thumb.title = 'Recorte central para acompanhar a primeira foto do carrossel.';
@@ -2226,6 +2268,7 @@ function updateInstagramCarouselFraming() {
     });
     const warning = document.getElementById('carousel-crop-warning');
     if (warning) warning.hidden = croppedCount === 0;
+    refreshInstagramMediaError();
 }
 
 function composerMediaChanged() {

@@ -411,6 +411,14 @@ class PublishEngine:
                 link_url=link_url,
             )
 
+            if platform in ("instagram", "instagram_personal") and post_type == PostType.CAROUSEL:
+                from apps.composer.instagram_media import validate_carousel_assets
+
+                validate_carousel_assets(
+                    [pm.media_asset for pm in attachments if pm.media_asset.file],
+                    strict=True, local_files=media_files,
+                )
+
             logger.info(
                 "Publishing to %s (account: %s, type: %s, media: %d)",
                 platform,

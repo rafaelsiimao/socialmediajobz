@@ -2,9 +2,10 @@
 Pending media thumbnails - shown before a post is saved.
 Context: pending_assets, workspace.
 {% endcomment %}
+{% load l10n %}
 
 {% for asset in pending_assets %}
-<div class="media-thumb cursor-grab active:cursor-grabbing select-none" draggable="true" data-asset-id="{{ asset.id }}" data-width="{{ asset.width|default:0 }}" data-height="{{ asset.height|default:0 }}">
+<div class="media-thumb cursor-grab active:cursor-grabbing select-none" draggable="true" data-asset-id="{{ asset.id }}" data-width="{{ asset.width|default:0 }}" data-height="{{ asset.height|default:0 }}" data-duration="{{ asset.duration|unlocalize }}" data-extension="{{ asset.file_extension }}">
     {% if asset.is_video %}
     <video src="{{ asset.file.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video>
     <div class="absolute inset-0 flex items-center justify-center pointer-events-none">

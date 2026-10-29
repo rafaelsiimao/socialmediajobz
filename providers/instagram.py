@@ -235,6 +235,8 @@ class InstagramProvider(SocialProvider):
     # ------------------------------------------------------------------
 
     def publish_post(self, access_token: str, content: PublishContent) -> PublishResult:
+        if content.post_type == PostType.CAROUSEL and not 2 <= len(content.media_urls) <= 10:
+            raise PublishError("O carrossel do Instagram aceita de 2 a 10 fotos e vídeos.", platform=self.platform_name)
         try:
             collaborators = normalize_collaborators(content.extra.get("collaborators"))
         except ValueError as exc:

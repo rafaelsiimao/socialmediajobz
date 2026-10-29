@@ -6,9 +6,9 @@ function openComposerCrop(button) {
     const list = document.getElementById('media-list');
     const cover = list.querySelector('.media-thumb[data-asset-id]');
     if (!thumb || !cover || list.dataset.instagramCarousel !== 'true') return;
-    const coverImage = cover.querySelector('img');
-    const width = Number(cover.dataset.width) || coverImage?.naturalWidth;
-    const height = Number(cover.dataset.height) || coverImage?.naturalHeight;
+    const coverImage = cover.querySelector('img, video');
+    const width = Number(cover.dataset.width) || coverImage?.naturalWidth || coverImage?.videoWidth;
+    const height = Number(cover.dataset.height) || coverImage?.naturalHeight || coverImage?.videoHeight;
     if (!width || !height) return;
     const dialog = document.getElementById('composer-crop-dialog');
     const image = document.getElementById('composer-crop-image');

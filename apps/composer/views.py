@@ -106,6 +106,9 @@ def _instagram_formats(request, workspace, collaborators=None):
         for account in accounts
     }
     validate_story_selection(accounts, effective)
+    from .instagram_media import validate_instagram_media_selection
+
+    validate_instagram_media_selection(request, workspace, accounts, effective, post_id)
     for acc_id, fmt in effective.items():
         if fmt == "story" and (collaborators or {}).get(acc_id):
             raise ValueError("Stories não aceitam colaboradores. Remova os colaboradores ou publique no feed.")
@@ -1451,6 +1454,12 @@ def upload_media(request, workspace_id, post_id=None):
         file_size=uploaded_file.size,
         source="upload",
     )
+
+    # Store server-side metadata for videos uploaded to Instagram feed composition.
+    if media_type == MediaAsset.MediaType.VIDEO and request.POST.get("inspect_video") == "1":
+        from .instagram_media import populate_video_metadata
+
+        populate_video_metadata(asset)
 
     # If a post ID is provided, attach immediately
     if post_id:

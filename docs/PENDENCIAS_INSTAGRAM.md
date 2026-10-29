@@ -1,8 +1,13 @@
-# Instagram — implementação adiada por Rafael (29/10/2026)
+# Instagram — carrosséis mistos retomados (29/10/2026)
+
+**Status:** Rafael retomou a implementação após a correção urgente do LinkedIn.
+Consultar `docs/CARROSSEIS_MISTOS_INSTAGRAM.md` para o fluxo implementado,
+validações, testes e implantação. O registro abaixo é histórico, não uma nova
+tarefa pendente nem uma instrução para adiar novamente.
 
 Rafael pediu guardar para depois a liberação de carrosséis mistos (fotos e vídeos).
 A prioridade passou a ser corrigir publicação de várias fotos e legenda no LinkedIn.
-Não implementar esta pendência durante a correção urgente.
+A correção urgente do LinkedIn foi enviada no commit `8fe0f0d` antes da retomada.
 
 Investigação já feita: `composerApp.processFiles` bloqueia múltiplos vídeos e
 mistura imagem/vídeo. Ambos os providers Instagram já criam filhos image_url e

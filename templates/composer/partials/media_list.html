@@ -2,9 +2,10 @@
 Media attachments list - rendered as sortable thumbnails.
 Context: media_attachments, post, workspace.
 {% endcomment %}
+{% load l10n %}
 
 {% for attachment in media_attachments %}
-<div class="media-thumb cursor-grab active:cursor-grabbing select-none" draggable="true" data-asset-id="{{ attachment.media_asset.id }}" data-width="{{ attachment.media_asset.width|default:0 }}" data-height="{{ attachment.media_asset.height|default:0 }}">
+<div class="media-thumb cursor-grab active:cursor-grabbing select-none" draggable="true" data-asset-id="{{ attachment.media_asset.id }}" data-width="{{ attachment.media_asset.width|default:0 }}" data-height="{{ attachment.media_asset.height|default:0 }}" data-duration="{{ attachment.media_asset.duration|unlocalize }}" data-extension="{{ attachment.media_asset.file_extension }}">
     {% if attachment.media_asset.is_video %}
     <video src="{{ attachment.media_asset.file.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"></video>
     <div class="absolute inset-0 flex items-center justify-center pointer-events-none">

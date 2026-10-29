@@ -39,14 +39,16 @@ O editor compara proporções, não tamanho em pixels: duas imagens 800×1000 e
 arredondamento. Usa dimensões salvas ou, quando faltam, as dimensões da imagem
 original carregada pelo navegador; não usa uma miniatura quadrada como referência.
 
-Fotos afetadas recebem borda vermelha, etiqueta Recorte e uma explicação. Todas
+Mídias afetadas recebem borda vermelha, etiqueta Recorte e uma explicação. Todas
 as miniaturas assumem o quadro da capa e exibem recorte central; a prévia de feed
 já usa a primeira foto com `object-fit: cover`. Reordenar, remover a capa ou
 adicionar fotos recalcula a indicação. O aviso não impede salvar/publicar.
 
 O enquadramento segue os limites atuais da prévia (4:5 a 1,91:1). Stories,
-Reels, uma única foto, seleções sem Instagram e carrosséis contendo vídeo não
-ativam esse aviso de carrossel fotográfico. Vale para os dois conectores IG.
+Reels, uma única mídia e seleções sem Instagram não ativam esse aviso. Com a
+implementação de carrosséis mistos, a capa pode ser foto ou vídeo; fotos
+continuam com ajuste manual. Ver `docs/CARROSSEIS_MISTOS_INSTAGRAM.md`.
+Vale para os dois conectores IG.
 Os arquivos originais não são alterados: o envio continua usando a API existente,
 que aplica seu enquadramento na publicação. Esta mudança é no editor, sem nova
 opção de publicação manual e sem alterações em LinkedIn ou Insights.

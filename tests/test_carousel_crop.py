@@ -96,3 +96,15 @@ def test_viewer_cannot_create_crop(client, crop_source, org_owner):
     workspace, _, _, ids = crop_source
     WorkspaceMembership.objects.filter(workspace=workspace, user=org_owner).update(workspace_role="viewer")
     assert client.post(crop_url(workspace, ids[2]), {}).status_code == 403
+
+
+@pytest.mark.django_db
+def test_photo_crop_can_follow_video_cover(client, crop_source):
+    workspace, _, _, ids = crop_source
+    MediaAsset.objects.filter(pk=ids[0]).update(media_type="video", duration=30, width=1920, height=1080)
+    response = client.post(crop_url(workspace, ids[2]), {
+        "cover_asset_id": ids[0], "x": 0, "y": 0, "width": 1600, "height": 900,
+    })
+    assert response.status_code == 200
+    asset = MediaAsset.objects.get(pk=response.json()["asset_id"])
+    assert abs(asset.width / asset.height - 1920 / 1080) < .01

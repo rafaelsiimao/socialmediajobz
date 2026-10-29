@@ -168,9 +168,9 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
             {# ─── Carousel ─── #}
             <div class="relative bg-stone-100 overflow-hidden flex items-center justify-center" style="aspect-ratio: 4/5;" x-data="{ slide: 0, count: {{ media_items|length }} }">
                 {% for m in media_items %}
-                <div x-show="slide === {{ forloop.counter0 }}" class="absolute inset-0">
+                <div x-show="slide === {{ forloop.counter0 }}" class="absolute inset-0" data-carousel-slide="{{ forloop.counter0 }}" x-effect="if (slide !== {{ forloop.counter0 }}) $el.querySelector('video')?.pause()">
                     {% if m.is_video %}
-                    <video src="{{ m.url }}#t=0.5" class="w-full h-full object-cover" muted preload="metadata"
+                    <video src="{{ m.url }}" class="w-full h-full object-cover" controls playsinline preload="metadata" aria-label="Vídeo do carrossel"
                            {% if forloop.first %}onloadedmetadata="if (this.videoWidth && this.videoHeight) { const r = Math.min(1.91, Math.max(0.8, this.videoWidth / this.videoHeight)); this.closest('[style*=\'aspect-ratio\']').style.aspectRatio = r; }"{% endif %}></video>
                     {% else %}
                     <img src="{{ m.url }}" class="w-full h-full object-cover" alt=""
@@ -189,7 +189,7 @@ Context: previews (list of dicts with account, title, caption, first_comment, ch
                     <svg class="w-3.5 h-3.5 text-stone-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
                 </button>
                 <!-- Dot indicators -->
-                <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                <div class="absolute left-1/2 -translate-x-1/2 flex gap-1.5" style="bottom: 54px;">
                     {% for m in media_items %}
                     <button type="button" @click.stop="slide = {{ forloop.counter0 }}" class="w-1.5 h-1.5 rounded-full transition-colors" :class="slide === {{ forloop.counter0 }} ? 'bg-[#3897f0]' : 'bg-white/60'"></button>
                     {% endfor %}
