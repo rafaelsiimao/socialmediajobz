@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 import httpx
 
@@ -63,6 +63,7 @@ class LinkedInProvider(SocialProvider):
         return [
             PostType.TEXT,
             PostType.IMAGE,
+            PostType.CAROUSEL,
             PostType.VIDEO,
             PostType.LINK,
             PostType.ARTICLE,
@@ -198,7 +199,7 @@ class LinkedInProvider(SocialProvider):
             profile = self.get_profile(access_token)
             author = f"urn:li:person:{profile.platform_id}"
 
-        if content.post_type == PostType.IMAGE and (content.media_files or content.media_urls):
+        if content.post_type in (PostType.IMAGE, PostType.CAROUSEL) and (content.media_files or content.media_urls):
             return self._publish_image_post(access_token, author, content)
         if content.post_type == PostType.VIDEO and (content.media_files or content.media_urls):
             return self._publish_video_post(access_token, author, content)
@@ -209,6 +210,11 @@ class LinkedInProvider(SocialProvider):
         return self._publish_text_post(access_token, author, content)
 
     def _build_post_body(self, author: str, commentary: str) -> dict:
+        # Posts API parses `commentary` as LinkedIn little text, not plain text.
+        # Escape its reserved characters once at the transport boundary; keep
+        # the stored caption, Unicode, line breaks and complete text unchanged.
+        reserved = frozenset(r"\|{}@[]()<>#*_~")
+        commentary = "".join(f"\\{char}" if char in reserved else char for char in commentary)
         return {
             "author": author,
             "commentary": commentary,
@@ -248,41 +254,44 @@ class LinkedInProvider(SocialProvider):
         )
 
     def _publish_image_post(self, access_token: str, author: str, content: PublishContent) -> PublishResult:
-        # Step 1: initialize upload
-        init_resp = self._request(
-            "POST",
-            f"{API_BASE}/rest/images",
-            access_token=access_token,
-            headers=LINKEDIN_HEADERS,
-            params={"action": "initializeUpload"},
-            json={
-                "initializeUploadRequest": {
-                    "owner": author,
-                }
-            },
-        )
-        init_data = init_resp.json().get("value", {})
-        upload_url = init_data.get("uploadUrl", "")
-        image_urn = init_data.get("image", "")
-
-        if not upload_url or not image_urn:
+        sources = content.media_files or content.media_urls
+        if len(sources) > 20:
             raise PublishError(
-                "Failed to initialize LinkedIn image upload",
+                "O LinkedIn permite no máximo 20 fotos por publicação.",
                 platform=self.platform_name,
-                raw_response=init_data,
             )
+        if any(urlsplit(source).path.lower().endswith((".mp4", ".mov", ".webm", ".avi", ".m4v")) for source in sources):
+            raise PublishError("O carrossel do LinkedIn aceita somente fotos. Separe os vídeos.", platform=self.platform_name)
 
-        # Step 2: upload image binary (prefer local file to avoid extra network hop)
-        image_source = content.media_files[0] if content.media_files else content.media_urls[0]
-        self._upload_binary(access_token, upload_url, image_source)
+        image_urns = []
+        for source in sources:
+            init_resp = self._request(
+                "POST",
+                f"{API_BASE}/rest/images",
+                access_token=access_token,
+                headers=LINKEDIN_HEADERS,
+                params={"action": "initializeUpload"},
+                json={"initializeUploadRequest": {"owner": author}},
+            )
+            init_data = init_resp.json().get("value", {})
+            upload_url = init_data.get("uploadUrl", "")
+            image_urn = init_data.get("image", "")
+            if not upload_url or not image_urn:
+                raise PublishError(
+                    "Failed to initialize LinkedIn image upload",
+                    platform=self.platform_name,
+                    raw_response=init_data,
+                )
+            self._upload_binary(access_token, upload_url, source)
+            image_urns.append(image_urn)
 
-        # Step 3: create post with image
+        # Create exactly one post after every image has uploaded successfully.
         body = self._build_post_body(author, content.text)
-        body["content"] = {
-            "media": {
-                "id": image_urn,
-            }
-        }
+        body["content"] = (
+            {"media": {"id": image_urns[0]}}
+            if len(image_urns) == 1
+            else {"multiImage": {"images": [{"id": urn} for urn in image_urns]}}
+        )
 
         resp = self._request(
             "POST",
@@ -295,7 +304,7 @@ class LinkedInProvider(SocialProvider):
         return PublishResult(
             platform_post_id=post_urn,
             url=self._post_urn_to_url(post_urn),
-            extra={"urn": post_urn, "image_urn": image_urn},
+            extra={"urn": post_urn, **({"image_urn": image_urns[0]} if len(image_urns) == 1 else {"image_urns": image_urns})},
         )
 
     def _publish_video_post(self, access_token: str, author: str, content: PublishContent) -> PublishResult:
