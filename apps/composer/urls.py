@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import crop_views, views
 
 app_name = "composer"
 
@@ -37,6 +37,7 @@ urlpatterns = [
     # Live preview
     path("compose/preview/", views.preview, name="preview"),
     # Media
+    path("compose/crop-media/<uuid:asset_id>/", crop_views.crop_media, name="crop_media"),
     path("compose/media-picker/", views.media_picker, name="media_picker"),
     path("compose/thumbnail-picker/", views.thumbnail_picker, name="thumbnail_picker"),
     path("compose/thumbnail-upload/", views.thumbnail_upload, name="thumbnail_upload"),

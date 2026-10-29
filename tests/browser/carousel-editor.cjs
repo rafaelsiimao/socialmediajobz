@@ -11,9 +11,11 @@ const { chromium } = require('playwright');
     const browser = await chromium.launch({ channel: 'msedge', headless: true });
     try {
         const page = await browser.newPage({ viewport: { width: 1440, height: 1050 } });
-        const errors = [], saves = [], previews = [];
+        const errors = [], saves = [], previews = [], crops = [];
+        let failCrop = true;
+        const croppedId = '11111111-1111-4111-8111-111111111111';
         page.on('pageerror', error => errors.push(error.message));
-        await page.route('**/*', route => {
+        await page.route('**/*', async route => {
             const req = route.request(), url = new URL(req.url());
             if (url.origin !== 'http://carousel.local') return route.abort();
             if (url.pathname.startsWith('/static/')) {
@@ -34,7 +36,32 @@ const { chromium } = require('playwright');
                 previews.push(url.searchParams);
                 return route.fulfill({ body: '<p>Prévia</p>' });
             }
-            if (url.pathname.startsWith('/media/')) return route.fulfill({ body: '' });
+            if (url.pathname.includes('/crop-media/')) {
+                crops.push(req.postData());
+                assert.ok(req.headers()['x-csrftoken']);
+                if (failCrop) {
+                    failCrop = false;
+                    return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'Falha simulada. Tente aplicar novamente.' }) });
+                }
+                const html = await page.evaluate(id => {
+                    const state = composerCrop;
+                    const thumb = state.thumb.cloneNode(true);
+                    thumb.dataset.assetId = id;
+                    thumb.dataset.width = 800;
+                    thumb.dataset.height = 450;
+                    delete thumb.dataset.sortableInitialized;
+                    thumb.querySelector('input[name=media_ids]').value = id;
+                    const pending = thumb.querySelector('input[name=pending_media_ids]');
+                    if (pending) pending.value = id;
+                    thumb.querySelector('img').src = '/media/tests/cropped.jpg';
+                    return thumb.outerHTML;
+                }, croppedId);
+                return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ asset_id: croppedId, html }) });
+            }
+            if (url.pathname.startsWith('/media/')) {
+                const size = url.pathname.includes('carousel-2') ? [1600, 900] : url.pathname.includes('cropped') ? [800, 450] : [800, 1000];
+                return route.fulfill({ contentType: 'image/svg+xml', body: `<svg xmlns="http://www.w3.org/2000/svg" width="${size[0]}" height="${size[1]}"><rect width="100%" height="100%" fill="lightblue"/><circle cx="75%" cy="50%" r="150" fill="orange"/></svg>` });
+            }
             return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fixture.html });
         });
         await page.goto('http://carousel.local/editor/');
@@ -54,6 +81,21 @@ const { chromium } = require('playwright');
         assert.equal(await page.locator('#media-list .media-crop-warning').count(), 1);
         assert.equal(await page.locator('#media-list .media-crop-warning').getAttribute('data-asset-id'), fixture.mediaIds[2]);
         assert.equal(await page.locator('#media-list .media-crop-warning').evaluate(el => getComputedStyle(el).borderColor), 'rgb(220, 38, 38)');
+        await page.locator('#media-list .media-crop-warning').getByRole('button', { name: 'Ajustar recorte' }).click();
+        const modal = page.getByRole('dialog', { name: 'Ajustar recorte' });
+        const applyCrop = modal.getByRole('button', { name: 'Aplicar recorte' });
+        await page.waitForFunction(() => !document.getElementById('composer-crop-apply').disabled);
+        const beforeDrag = await page.evaluate(() => composerCrop.cropper.getData().x);
+        const cropFace = await modal.locator('.cropper-face').boundingBox();
+        await page.mouse.move(cropFace.x + cropFace.width / 2, cropFace.y + cropFace.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(cropFace.x + cropFace.width / 2 + 25, cropFace.y + cropFace.height / 2, { steps: 8 });
+        await page.mouse.up();
+        assert.notEqual(await page.evaluate(() => composerCrop.cropper.getData().x), beforeDrag, 'Dragging must reposition the crop');
+        await page.keyboard.press('Escape');
+        await modal.waitFor({ state: 'hidden' });
+        assert.deepEqual(await ids(), fixture.mediaIds, 'Cancel must preserve original media');
+        assert.equal(crops.length, 0);
         await page.locator('#media-list .media-thumb').nth(2).getByRole('button', { name: 'Mover para a esquerda' }).click();
         await page.locator('#media-list .media-thumb').nth(1).getByRole('button', { name: 'Mover para a esquerda' }).click();
         assert.equal(await page.locator('#media-list .media-crop-warning').count(), 2);
@@ -113,7 +155,21 @@ const { chromium } = require('playwright');
         await page.waitForTimeout(1600);
         assert.deepEqual(saves.at(-1).getAll('media_ids'), [fixture.mediaIds[2], fixture.mediaIds[0]]);
         assert.deepEqual(saves.at(-1).getAll('pending_media_ids'), [fixture.mediaIds[2], fixture.mediaIds[0]]);
+        await page.locator('#media-list .media-crop-warning').getByRole('button', { name: 'Ajustar recorte' }).click();
+        await page.waitForFunction(() => !document.getElementById('composer-crop-apply').disabled);
+        const cropRatio = await page.evaluate(() => { const data = composerCrop.cropper.getData(); return data.width / data.height; });
+        assert.ok(Math.abs(cropRatio - 1600 / 900) < .02, 'Crop must use the current landscape cover');
+        await applyCrop.click();
+        await modal.getByRole('alert').filter({ hasText: 'Falha simulada' }).waitFor();
+        assert.deepEqual(await ids(), [fixture.mediaIds[2], fixture.mediaIds[0]], 'Failed crop must preserve original');
+        await applyCrop.click();
+        await modal.waitFor({ state: 'hidden' });
+        assert.deepEqual(await ids(), [fixture.mediaIds[2], croppedId]);
+        await warning.waitFor({ state: 'hidden' });
+        await page.waitForTimeout(1600);
+        assert.deepEqual(saves.at(-1).getAll('media_ids'), [fixture.mediaIds[2], croppedId]);
+        assert.equal(crops.length, 2);
         assert.deepEqual(errors, []);
-        console.log('PASS: successive uploads, drag, left/right controls, remove, empty preview and autosave payloads.');
+        console.log('PASS: carousel ordering/removal/framing; crop modal drag, cancel, cover ratio, errors/retry and replacement autosave on mobile.');
     } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

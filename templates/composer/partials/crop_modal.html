@@ -1,0 +1,20 @@
+<dialog id="composer-crop-dialog" aria-labelledby="composer-crop-title"
+        data-crop-url="{% url 'composer:crop_media' workspace_id=workspace.id asset_id='00000000-0000-0000-0000-000000000000' %}">
+    <h2 id="composer-crop-title">Ajustar recorte</h2>
+    <p>Arraste a foto ou a seleção para escolher o enquadramento. O formato acompanha a capa.</p>
+    <div class="composer-crop-layout">
+        <div id="composer-crop-stage"><img id="composer-crop-image" alt="Foto para ajustar o recorte"></div>
+        <div><strong>Resultado</strong><div id="composer-crop-preview"></div></div>
+    </div>
+    <div class="composer-crop-tools">
+        <button type="button" onclick="zoomComposerCrop(.1)" aria-label="Aproximar foto">Zoom +</button>
+        <button type="button" onclick="zoomComposerCrop(-.1)" aria-label="Afastar foto">Zoom −</button>
+        <button type="button" onclick="resetComposerCrop()">Recomeçar</button>
+    </div>
+    <p id="composer-crop-error" role="alert" hidden></p>
+    <p>O original será preservado na biblioteca. O recorte substitui somente esta foto no carrossel.</p>
+    <div class="composer-crop-actions">
+        <button id="composer-crop-cancel" type="button" onclick="closeComposerCrop()">Cancelar</button>
+        <button id="composer-crop-apply" type="button" onclick="applyComposerCrop()" disabled>Aplicar recorte</button>
+    </div>
+</dialog>

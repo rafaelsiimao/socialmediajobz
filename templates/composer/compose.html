@@ -6,6 +6,7 @@
 {% comment %}Header is rendered inside the content block to avoid overlap with the -m-6 layout{% endcomment %}
 
 {% block extra_head %}
+<link rel="stylesheet" href="{% static 'js/vendor/cropper.min.css' %}">
 <style>
     /* ── Composer-specific overrides ──────────────────────────── */
     /* Remove parent padding/overflow so the composer can fill the full area */
@@ -202,6 +203,33 @@
     .media-order-controls button { min-width: 24px; min-height: 24px; cursor: pointer; }
     .media-order-controls button:disabled { opacity: .3; cursor: default; }
     .media-order-controls button:focus-visible { outline: 2px solid white; outline-offset: -2px; }
+    .media-order-controls .media-crop-btn { display: none; }
+    .instagram-carousel-photo .media-order-controls .media-crop-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        background: var(--primary); color: white;
+    }
+    #composer-crop-dialog {
+        width: min(900px, calc(100% - 24px)); max-height: 94dvh; overflow: auto;
+        margin: auto; border: 1px solid #E7E5E4; border-radius: 16px; padding: 20px;
+        color: #1C1917; background: white;
+    }
+    #composer-crop-dialog::backdrop { background: rgba(0, 0, 0, .65); }
+    #composer-crop-dialog h2 { font-size: 20px; font-weight: 600; }
+    #composer-crop-dialog p { font-size: 13px; margin: 12px 0; }
+    .composer-crop-layout { display: grid; grid-template-columns: minmax(0, 1fr) 160px; gap: 20px; }
+    #composer-crop-stage { height: min(52vh, 420px); min-width: 0; background: #F5F5F4; }
+    #composer-crop-stage > img { display: block; max-width: 100%; max-height: 100%; }
+    #composer-crop-preview { width: 160px; overflow: hidden; margin-top: 8px; background: #F5F5F4; }
+    .composer-crop-tools, .composer-crop-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .composer-crop-actions { justify-content: flex-end; }
+    #composer-crop-dialog button { border: 1px solid #D6D3D1; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+    #composer-crop-dialog button:disabled { opacity: .5; cursor: wait; }
+    #composer-crop-apply { background: var(--primary); color: white; }
+    #composer-crop-error { color: #B91C1C; }
+    @media (max-width: 600px) {
+        .composer-crop-layout { grid-template-columns: minmax(0, 1fr); }
+        #composer-crop-preview { width: 100px; }
+    }
 
     /* Upload progress overlay */
     .media-thumb .upload-overlay {
@@ -1558,9 +1586,12 @@
     </div>
 
 </div>
+{% include "composer/partials/crop_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/vendor/cropper.min.js' %}"></script>
+<script src="{% static 'js/composer-crop.js' %}"></script>
 <script>
 function composerApp() {
     return {
@@ -2143,7 +2174,7 @@ function updateMediaPositions() {
     thumbs.forEach((thumb, index) => {
         const position = thumb.querySelector('.media-position');
         if (position) position.textContent = index + 1;
-        const buttons = thumb.querySelectorAll('.media-order-controls button');
+        const buttons = thumb.querySelectorAll('.media-order-controls button:not(.media-crop-btn)');
         if (buttons.length === 2) {
             buttons[0].disabled = index === 0;
             buttons[1].disabled = index === thumbs.length - 1;
@@ -2180,6 +2211,7 @@ function updateInstagramCarouselFraming() {
         // Ignore rounding differences below 1% (e.g. two exports of the same format).
         const cropped = !!(frameRatio && ratio && Math.abs(ratio / frameRatio - 1) > .01);
         thumb.classList.toggle('media-crop-warning', cropped);
+        thumb.classList.toggle('instagram-carousel-photo', !!frameRatio);
         if (cropped) {
             croppedCount++;
             thumb.title = 'Recorte central para acompanhar a primeira foto do carrossel.';

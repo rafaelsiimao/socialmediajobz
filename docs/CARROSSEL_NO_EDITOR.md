@@ -5,6 +5,32 @@ indica a ordem do carrossel. O X remove a mídia desta publicação, preservando
 arquivo original na biblioteca. A prévia atualiza e as mudanças disparam o
 salvamento automático após um segundo; Salvar Rascunho continua disponível.
 
+## Modal de recorte — 29/10/2026
+
+O botão azul com ícone de recorte, entre as setas da miniatura, abre **Ajustar
+recorte** nos carrosséis fotográficos do feed Instagram. A proporção fica fixa
+conforme a capa; a pessoa pode arrastar a foto/seleção, aproximar, afastar,
+recomeçar, conferir o Resultado e aplicar ou cancelar. Escape também cancela.
+
+Reaproveita o Cropper.js 1.6.2 já distribuído no projeto. O navegador envia apenas
+coordenadas ao servidor, que lê o arquivo pelo storage e recorta com Pillow;
+não depende de exportar canvas de imagens hospedadas em outro domínio.
+
+`POST compose/crop-media/<asset_id>/` exige login, create_posts, upload_media,
+CSRF e vínculo com workspace. Origem e capa devem ser fotos desse workspace.
+Valida área, coordenadas finitas, proporção da capa, orientação EXIF e até 40 MP.
+Cria JPEG novo (até 1080×1350 sem ampliar), preservando o original e os vínculos
+de outras publicações. Responde com uma miniatura substituta; save/autosave normal
+persiste somente a nova lista de IDs, mantendo a ordem. Nenhum vínculo é alterado
+no endpoint de recorte. Cancelar não cria arquivo nem modifica o formulário.
+Falha mantém o modal e a foto original, com mensagem para tentar novamente.
+
+Conferência: 61 testes Python (inclui 11 para recorte, área escolhida, reabertura,
+isolamento e permissões) + navegador isolado com Cropper real: arraste, Escape,
+proporção da capa, erro/retry, substituição e autosave no celular. Django check e
+lint do código novo passaram. Sem migrações ou variáveis novas; implantar somente
+web e Ctrl+F5. Não houve publicação real ou acesso às contas sociais nos testes.
+
 ## Proporções diferentes — 29/10/2026
 
 Para carrosséis de fotos no feed do Instagram, a capa define o enquadramento.

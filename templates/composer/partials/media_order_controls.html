@@ -2,6 +2,10 @@
     <button type="button" aria-label="Mover para a esquerda" title="Mover para a esquerda"
             onclick="event.preventDefault(); event.stopPropagation(); moveComposerMedia(this, -1)">←</button>
     <span class="media-position" aria-label="Posição"></span>
+    <button type="button" class="media-crop-btn" aria-label="Ajustar recorte" title="Ajustar recorte"
+            onclick="event.preventDefault(); event.stopPropagation(); openComposerCrop(this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3v15h15M3 6h15v15"/></svg>
+    </button>
     <button type="button" aria-label="Mover para a direita" title="Mover para a direita"
             onclick="event.preventDefault(); event.stopPropagation(); moveComposerMedia(this, 1)">→</button>
 </div>
