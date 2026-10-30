@@ -59,6 +59,7 @@ urlpatterns = [
     path("categories/<uuid:category_id>/edit/", views.category_edit, name="category_edit"),
     path("categories/<uuid:category_id>/delete/", views.category_delete, name="category_delete"),
     # Post Templates
+    path("video-templates/", views.video_templates, name="video_templates"),
     path("templates/", views.template_list, name="template_list"),
     path("templates/<uuid:template_id>/delete/", views.template_delete, name="template_delete"),
     path("templates/<uuid:template_id>/use/", views.use_template, name="use_template"),

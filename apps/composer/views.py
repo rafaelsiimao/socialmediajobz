@@ -2427,6 +2427,14 @@ def category_delete(request, workspace_id, category_id):
 
 
 @login_required
+@require_GET
+def video_templates(request, workspace_id):
+    """Alpha landing page for the upcoming video template library."""
+    workspace = _get_workspace(request, workspace_id)
+    return render(request, "composer/video_templates.html", {"workspace": workspace})
+
+
+@login_required
 def template_list(request, workspace_id):
     """Settings page for managing post templates."""
     workspace = _get_workspace(request, workspace_id)

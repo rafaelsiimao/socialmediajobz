@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Templates de vídeo - {{ workspace.name }} - Jobz Social Media{% endblock %}
+
+{% block page_header %}
+<div class="mb-6">
+    <div class="flex items-center gap-3">
+        <h1 class="text-base font-semibold text-stone-900">Templates de vídeo</h1>
+        <span class="text-xs font-semibold rounded-full px-3 py-1" style="color: var(--primary); background: var(--color-brand-50, #eff6ff);">Alpha</span>
+    </div>
+    <p class="text-sm text-stone-500 mt-1">Um novo espaço para criar vídeos a partir de modelos prontos.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="max-w-3xl bg-white rounded-xl border border-stone-200 px-6 py-16 text-center" aria-labelledby="video-templates-status">
+    <div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4" style="color: var(--primary); background: var(--color-brand-50, #eff6ff);">
+        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m10 8 6 4-6 4z"/></svg>
+    </div>
+    <h2 id="video-templates-status" class="text-base font-semibold text-stone-900">Os primeiros templates estão a caminho</h2>
+    <p class="text-sm text-stone-500 mt-3 max-w-lg mx-auto">Escolha um modelo, adicione seus vídeos e personalize o resultado. Estamos preparando essa experiência para você.</p>
+    <p class="text-xs text-stone-500 mt-6">Versão Alpha · A criação e a exportação de vídeos ainda não estão disponíveis.</p>
+</section>
+{% endblock %}
