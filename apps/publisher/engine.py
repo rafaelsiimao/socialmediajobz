@@ -25,6 +25,7 @@ from background_task import background
 from django.conf import settings
 from django.db import transaction
 from django.db.models.functions import Coalesce
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.composer.models import PlatformPost
@@ -84,6 +85,7 @@ class PublishEngine:
         return list(
             PlatformPost.objects.filter(
                 status=PlatformPost.Status.SCHEDULED,
+                next_retry_at__isnull=True,
             )
             .annotate(effective_at=Coalesce("scheduled_at", "post__scheduled_at"))
             .filter(effective_at__lte=now)
@@ -157,6 +159,11 @@ class PublishEngine:
 
         if rate_state and rate_state.is_rate_limited:
             error_msg = f"Rate limited until {rate_state.window_resets_at}"
+            PublishLog.objects.create(
+                platform_post=platform_post,
+                attempt_number=platform_post.retry_count + 1,
+                error_message=error_msg,
+            )
             self._schedule_retry(platform_post, error_msg)
             return {"success": False, "error": error_msg}
 
@@ -170,6 +177,8 @@ class PublishEngine:
                 platform_post.platform_post_id = result.get("platform_post_id", "")
                 platform_post.status = PlatformPost.Status.PUBLISHED
                 platform_post.published_at = timezone.now()
+                platform_post.publish_error = ""
+                platform_post.next_retry_at = None
                 platform_post.save()
 
                 # Log success
@@ -183,6 +192,8 @@ class PublishEngine:
 
                 # Update rate limit state
                 self._update_rate_limit(account, result)
+
+                self._notify_publish_result(platform_post, success=True)
 
                 return result
             else:
@@ -489,6 +500,7 @@ class PublishEngine:
         if platform_post.retry_count >= MAX_RETRIES:
             platform_post.status = PlatformPost.Status.FAILED
             platform_post.publish_error = error_msg
+            platform_post.next_retry_at = None
             platform_post.save()
             logger.warning(
                 "PlatformPost %s failed after %d retries: %s",
@@ -496,6 +508,7 @@ class PublishEngine:
                 MAX_RETRIES,
                 error_msg,
             )
+            self._notify_publish_result(platform_post, success=False)
             return
 
         backoff_seconds = RETRY_BACKOFF[min(platform_post.retry_count, len(RETRY_BACKOFF) - 1)]
@@ -513,6 +526,37 @@ class PublishEngine:
             platform_post.id,
             backoff_seconds,
         )
+
+    @staticmethod
+    def _notify_publish_result(platform_post, *, success):
+        """Alert the author without letting notification failures retry a published post."""
+        from apps.notifications.engine import notify
+        from apps.notifications.models import EventType
+
+        post = platform_post.post
+        if not post.author_id:
+            return
+        account = platform_post.social_account
+        path = reverse("composer:compose_edit", kwargs={"workspace_id": post.workspace_id, "post_id": post.id})
+        action_url = f"{settings.APP_URL.rstrip('/')}{path}"
+        try:
+            notify(
+                user=post.author,
+                event_type=EventType.POST_PUBLISHED if success else EventType.POST_FAILED,
+                title="Publicação realizada" if success else "Falha na publicação",
+                body=(
+                    f"'{post.title or 'Sem título'}' em {account.account_name} ({account.get_platform_display()}). "
+                    + ("Publicado com sucesso." if success else f"Tentativas esgotadas. Motivo: {platform_post.publish_error}")
+                ),
+                data={
+                    "post_id": str(post.id),
+                    "platform_post_id": str(platform_post.id),
+                    "workspace_id": str(post.workspace_id),
+                    "action_url": action_url,
+                },
+            )
+        except Exception:
+            logger.exception("Could not notify publication result for %s", platform_post.id)
 
     def _process_retries(self):
         """Process platform posts that are due for retry."""

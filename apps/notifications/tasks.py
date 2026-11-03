@@ -6,6 +6,7 @@ These are meant to be called by django-background-tasks or a cron schedule.
 import logging
 from datetime import timedelta
 
+from background_task import background
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
@@ -74,3 +75,9 @@ def retry_failed_deliveries():
     count = _retry()
     if count > 0:
         logger.info("Retried %d failed notification deliveries", count)
+
+
+@background(schedule=0)
+def retry_notification_deliveries():
+    """Recurring entry point consumed by process_tasks."""
+    retry_failed_deliveries()

@@ -17,6 +17,10 @@ from .models import (
 @require_GET
 def notification_drawer(request):
     """HTMX partial: renders the 50 most recent notifications for the drawer."""
+    return _notification_drawer(request)
+
+
+def _notification_drawer(request):
     notifications = Notification.objects.filter(user=request.user).order_by("-created_at")[:50]
     return render(
         request,
@@ -31,8 +35,13 @@ def notification_drawer(request):
 @require_GET
 def notification_list(request):
     """Full notification history page with filtering."""
-    event_type = request.GET.get("event_type", "")
-    read_status = request.GET.get("read_status", "")
+    return _notification_history(request)
+
+
+def _notification_history(request):
+    params = request.GET if request.method == "GET" else request.POST
+    event_type = params.get("event_type", "")
+    read_status = params.get("read_status", "")
 
     qs = Notification.objects.filter(user=request.user)
 
@@ -44,7 +53,10 @@ def notification_list(request):
         qs = qs.filter(is_read=False)
 
     # Pagination
-    page = int(request.GET.get("page", 1))
+    try:
+        page = max(1, int(params.get("page", 1)))
+    except (TypeError, ValueError):
+        page = 1
     per_page = 30
     offset = (page - 1) * per_page
     notifications = qs[offset : offset + per_page]
@@ -77,6 +89,8 @@ def mark_as_read(request, notification_id):
     )
 
     if request.htmx:
+        if request.headers.get("HX-Target") == "notification-history-list":
+            return _notification_history(request)
         return render(request, "notifications/partials/empty.html")
     return JsonResponse({"ok": True})
 
@@ -88,7 +102,9 @@ def mark_all_read(request):
     Notification.objects.filter(user=request.user, is_read=False).update(is_read=True, read_at=timezone.now())
 
     if request.htmx:
-        return notification_drawer(request)
+        if request.headers.get("HX-Target") == "notification-history-list":
+            return _notification_history(request)
+        return _notification_drawer(request)
     return JsonResponse({"ok": True})
 
 

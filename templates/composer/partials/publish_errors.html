@@ -1,0 +1,13 @@
+{% for pp in post.platform_posts.all %}
+{% if pp.publish_error and pp.status != "published" %}
+<div role="alert" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+    <p class="font-semibold">{{ pp.social_account.account_name }} ({{ pp.social_account.get_platform_display }}) — {% if pp.status == "failed" %}Falha na publicação{% else %}Publicação pendente{% endif %}</p>
+    <p class="mt-1 whitespace-pre-wrap break-words">{{ pp.publish_error }}</p>
+    {% if pp.status == "failed" %}
+    <p class="mt-2">As tentativas automáticas foram esgotadas. Confira o motivo antes de reenviar.</p>
+    {% elif pp.status == "scheduled" and pp.next_retry_at %}
+    <p class="mt-2">Nova tentativa automática prevista para {{ pp.next_retry_at|date:"d/m/Y H:i:s T" }}.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endfor %}

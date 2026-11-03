@@ -616,9 +616,10 @@
                 </a>
                 {% endif %}
 
-                <a href="{% url 'notifications:list' %}" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'list' and request.resolver_match.app_name == 'notifications' %}active{% endif %}">
+                <a href="{% url 'notifications:list' %}" x-data="notificationBell()" x-init="startPolling()" class="mb-1 sidebar-nav-item {% if request.resolver_match.url_name == 'list' and request.resolver_match.app_name == 'notifications' %}active{% endif %}">
                     <svg class="flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
                     <span class="sidebar-nav-label">Notificações</span>
+                    <span class="sidebar-badge" x-show="unreadCount > 0" x-text="unreadCount > 99 ? '99+' : unreadCount" x-cloak aria-label="Notificações não lidas"></span>
                 </a>
 
                 {% if request.workspace %}
@@ -856,7 +857,7 @@
         function notificationBell() {
             return {
                 open: false,
-                unreadCount: 0,
+                unreadCount: {{ unread_notification_count|default:0 }},
                 _interval: null,
                 toggle() {
                     this.open = !this.open;
@@ -890,8 +891,8 @@
             if (target && (target.id === 'notification-drawer-content' || target.id === 'notification-history-list' || target.closest && target.closest('#notification-drawer-content'))) {
                 /* Trigger a count refresh on the bell component */
                 var bellEl = document.querySelector('[x-data="notificationBell()"]');
-                if (bellEl && bellEl.__x) {
-                    bellEl.__x.$data.fetchCount();
+                if (bellEl && window.Alpine) {
+                    Alpine.$data(bellEl).fetchCount();
                 }
             }
         });
