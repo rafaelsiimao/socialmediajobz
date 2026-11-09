@@ -8,6 +8,7 @@ Company Pages the authenticated member administers via
 from __future__ import annotations
 
 import logging
+from urllib.parse import quote, urlencode
 
 from .exceptions import APIError
 from .linkedin import API_BASE, LINKEDIN_HEADERS, LinkedInProvider
@@ -73,16 +74,21 @@ class LinkedInCompanyProvider(LinkedInProvider):
             key = "ugcPosts"
         else:
             raise APIError("Unsupported LinkedIn post identifier.", platform=self.platform_name)
-        data = self._request(
-            "GET",
-            f"{API_BASE}/rest/organizationalEntityShareStatistics",
-            access_token=access_token,
-            headers=LINKEDIN_HEADERS,
-            params={
+        # Rest.li 2.0 requires literal List delimiters, with the URN encoded
+        # inside them. Passing List(...) through httpx params encodes the
+        # delimiters too, causing LinkedIn's "Invalid value type" response.
+        query = urlencode(
+            {
                 "q": "organizationalEntity",
                 "organizationalEntity": f"urn:li:organization:{organization_id}",
-                key: f"List({post_id})",
-            },
+            }
+        )
+        query += f"&{key}=List({quote(post_id, safe='')})"
+        data = self._request(
+            "GET",
+            f"{API_BASE}/rest/organizationalEntityShareStatistics?{query}",
+            access_token=access_token,
+            headers=LINKEDIN_HEADERS,
         ).json()
         elements = data.get("elements", [])
         stats = elements[0].get("totalShareStatistics", {}) if elements else {}

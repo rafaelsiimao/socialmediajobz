@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 from django.utils import timezone
 
@@ -37,7 +38,7 @@ def test_company_metrics_use_organization_and_correct_post_kind(kind, parameter)
     response = MagicMock(json=lambda: {"elements": [{"totalShareStatistics": stats}]})
     with patch.object(provider, "_request", return_value=response) as request:
         result = provider.get_post_metrics("fake-token", f"urn:li:{kind}:456")
-    params = request.call_args.kwargs["params"]
+    params = httpx.URL(request.call_args.args[1]).params
     assert params["organizationalEntity"] == "urn:li:organization:123"
     assert params[parameter] == f"List(urn:li:{kind}:456)"
     assert (result.impressions, result.reach, result.engagements) == (100, 70, 11)
@@ -88,7 +89,7 @@ def test_refresh_selects_company_and_injects_organization(company_post):
     )
     with patch.object(LinkedInCompanyProvider, "_request", return_value=response) as request:
         snapshot = refresh_platform_post_metrics(company_post)
-    assert request.call_args.kwargs["params"]["organizationalEntity"] == "urn:li:organization:123"
+    assert httpx.URL(request.call_args.args[1]).params["organizationalEntity"] == "urn:li:organization:123"
     assert snapshot.views == 100
     assert snapshot.likes == 5
     assert snapshot.interactions == 7
