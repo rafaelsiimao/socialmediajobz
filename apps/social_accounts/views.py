@@ -681,7 +681,7 @@ def _create_or_update_account(
             "account_name": profile.name,
             "account_handle": profile.handle or "",
             "avatar_url": profile.avatar_url or "",
-            "follower_count": profile.follower_count,
+            **({"follower_count": profile.follower_count} if profile.follower_count is not None else {}),
             "oauth_access_token": access_token,
             "oauth_refresh_token": refresh_token or "",
             "token_expires_at": token_expires_at,

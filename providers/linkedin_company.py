@@ -10,7 +10,9 @@ from __future__ import annotations
 import logging
 from urllib.parse import quote, urlencode
 
-from .exceptions import APIError
+import httpx
+
+from .exceptions import APIError, RateLimitError
 from .linkedin import API_BASE, LINKEDIN_HEADERS, LinkedInProvider
 from .types import AccountProfile, PostMetrics, PublishContent, PublishResult
 
@@ -46,24 +48,38 @@ class LinkedInCompanyProvider(LinkedInProvider):
             access_token=access_token,
             headers=LINKEDIN_HEADERS,
         ).json()
-        network = self._request(
-            "GET",
-            f"{API_BASE}/rest/networkSizes/urn:li:organization:{organization_id}",
-            access_token=access_token,
-            headers=LINKEDIN_HEADERS,
-            params={"edgeType": "COMPANY_FOLLOWED_BY_MEMBER"},
-        ).json()
-        # Missing follower data is an API failure, not evidence of zero followers.
-        if "firstDegreeSize" not in network:
-            raise APIError("LinkedIn did not return the organization's follower count.", platform=self.platform_name)
+        followers = None
+        extra = dict(organization)
+        try:
+            network = self._request(
+                "GET",
+                f"{API_BASE}/rest/networkSizes/urn:li:organization:{organization_id}",
+                access_token=access_token,
+                headers=LINKEDIN_HEADERS,
+                params={"edgeType": "COMPANY_FOLLOWED_BY_MEMBER"},
+            ).json()
+            value = int(network["firstDegreeSize"])
+            if value < 0:
+                raise ValueError("Invalid follower count")
+            followers = value
+        except APIError as exc:
+            if exc.status_code == 401:
+                raise
+            extra["follower_count_error"] = str(exc)
+        except (RateLimitError, httpx.RequestError, KeyError, TypeError, ValueError) as exc:
+            extra["follower_count_error"] = str(exc)
+        # Reading the organization succeeded. Optional analytics failure is not
+        # proof that its access token expired; never replace missing data with 0.
+        if followers is None:
+            extra["follower_count_error"] = extra.get("follower_count_error") or "LinkedIn did not return the follower count."
         return AccountProfile(
             platform_id=organization_id,
             name=organization.get("localizedName")
             or organization.get("vanityName")
             or f"Organization {organization_id}",
             handle=organization.get("vanityName"),
-            follower_count=int(network["firstDegreeSize"]),
-            extra=organization,
+            follower_count=followers,
+            extra=extra,
         )
 
     def get_post_metrics(self, access_token: str, post_id: str) -> PostMetrics:

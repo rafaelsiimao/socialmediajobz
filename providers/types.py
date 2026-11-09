@@ -53,7 +53,7 @@ class AccountProfile:
     name: str
     handle: str | None = None
     avatar_url: str | None = None
-    follower_count: int = 0
+    follower_count: int | None = 0  # None means the platform did not supply this optional metric.
     extra: dict = field(default_factory=dict)
 
 
