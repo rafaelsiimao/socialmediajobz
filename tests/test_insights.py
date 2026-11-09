@@ -71,6 +71,66 @@ def test_summary_compares_with_previous_period(insights_setup):
 
 
 @pytest.mark.django_db
+def test_facebook_fetched_post_metrics_reach_filtered_insights_page(client, insights_setup):
+    from unittest.mock import MagicMock, patch
+
+    from apps.composer.metrics import refresh_platform_post_metrics
+    from providers.facebook import FacebookProvider
+
+    workspace, _, author = insights_setup
+    account = SocialAccount.objects.create(
+        workspace=workspace,
+        platform="facebook",
+        account_platform_id="page-123",
+        account_name="Jobz Facebook",
+        connection_status="connected",
+    )
+    pp = _published(workspace, account, author, 1, "Facebook comprovado")
+    response = MagicMock(
+        json=lambda: {
+            "reactions": {"summary": {"total_count": 37}},
+            "comments": {"summary": {"total_count": 9}},
+            "shares": {"count": 3},
+        }
+    )
+    with patch.object(FacebookProvider, "_request", return_value=response):
+        refresh_platform_post_metrics(pp)
+    page = client.get(
+        reverse("insights:page", kwargs={"workspace_id": workspace.id}), {"channel": str(account.id), "period": "7d"}
+    )
+    assert page.status_code == 200
+    cards = {card["label"]: card for card in page.context["summary"]}
+    assert cards["Reações"]["value"] == 37
+    assert cards["Comentários"]["value"] == 9
+    assert page.context["top_posts"][0].id == pp.id
+    assert "Facebook comprovado" in page.content.decode()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("status", ["error", "token_expiring", "disconnected"])
+def test_insights_keep_facebook_history_when_connection_is_not_healthy(client, insights_setup, status):
+    workspace, _, author = insights_setup
+    account = SocialAccount.objects.create(
+        workspace=workspace,
+        platform="facebook",
+        account_platform_id="historical-page",
+        account_name="Facebook com histórico",
+        connection_status=status,
+    )
+    pp = _published(workspace, account, author, 1, "Histórico preservado", likes=31, comments=6)
+    page = client.get(
+        reverse("insights:page", kwargs={"workspace_id": workspace.id}), {"channel": str(account.id), "period": "7d"}
+    )
+    assert account.id in [channel.id for channel in page.context["channels"]]
+    assert page.context["selected_channel"] == str(account.id)
+    assert page.context["performance"][0]["channel"].id == account.id
+    cards = {card["label"]: card for card in page.context["summary"]}
+    assert cards["Reações"]["value"] == 31
+    assert cards["Comentários"]["value"] == 6
+    assert page.context["top_posts"][0].id == pp.id
+
+
+@pytest.mark.django_db
 def test_page_renders_summary_top_posts_and_takeaways(client, insights_setup):
     workspace, account, author = insights_setup
     top = _published(workspace, account, author, 1, "campeao", likes=46, comments=1, reach=300, interactions=50)
@@ -158,6 +218,7 @@ def test_followers_history_drives_gain_and_line(insights_setup):
     today = timezone.localdate()
     FollowerSnapshot.objects.create(social_account=account, date=today - timedelta(days=40), followers=21000)
     FollowerSnapshot.objects.create(social_account=account, date=today - timedelta(days=10), followers=21100)
+    FollowerSnapshot.objects.create(social_account=account, date=today, followers=21200)
     period = services.resolve_period(workspace, "30d")
 
     data = services.followers_by_channel(workspace, period)

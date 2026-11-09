@@ -30,9 +30,7 @@ def _filters(request, workspace):
     period = services.resolve_period(
         workspace, request.GET.get("period", "30d"), request.GET.get("start"), request.GET.get("end")
     )
-    channels = SocialAccount.objects.filter(
-        workspace=workspace, connection_status=SocialAccount.ConnectionStatus.CONNECTED
-    ).order_by("platform", "account_name")
+    channels = services.accounts_for_insights(workspace)
     account_id = request.GET.get("channel") or None
     if account_id and not channels.filter(id=account_id).exists():
         account_id = None
@@ -71,8 +69,38 @@ def insights_page(request, workspace_id):
             "followers": services.followers_by_channel(workspace, period, account_id),
             "query": request.GET.urlencode(),
             "query_without_order": _query_without(request, "order"),
+            "can_refresh_followers": WorkspaceMembership.objects.get(user=request.user, workspace=workspace).effective_permissions.get("manage_social_accounts", False),
         },
     )
+
+
+@login_required
+@require_POST
+def refresh_followers(request, workspace_id):
+    """Queue a new observation, including retrying accounts with a failed check."""
+    from apps.social_accounts.tasks import check_social_account_health
+
+    workspace = _get_workspace(request, workspace_id)
+    membership = WorkspaceMembership.objects.get(user=request.user, workspace=workspace)
+    if not membership.effective_permissions.get("manage_social_accounts", False):
+        raise PermissionDenied("Você não pode atualizar estas contas.")
+    accounts = SocialAccount.objects.filter(workspace=workspace)
+    if request.POST.get("channel"):
+        account = get_object_or_404(accounts, pk=request.POST["channel"])
+        accounts = accounts.filter(pk=account.pk)
+    accounts = accounts.filter(platform__in=["facebook", "instagram", "instagram_personal", "linkedin_company"]).exclude(
+        connection_status=SocialAccount.ConnectionStatus.DISCONNECTED
+    )
+    count = 0
+    for account in accounts:
+        check_social_account_health(str(account.pk))
+        count += 1
+    if count:
+        messages.success(request, "Atualização de seguidores solicitada. Aguarde o processamento e recarregue a página.")
+    else:
+        messages.warning(request, "Nenhuma conta compatível disponível. Verifique as conexões nas configurações.")
+    url = reverse("insights:page", kwargs={"workspace_id": workspace.id})
+    return redirect(f"{url}?{request.POST.get('query', '')}")
 
 
 @login_required

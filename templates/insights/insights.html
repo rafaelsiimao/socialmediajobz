@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load insights_tags %}
+{% load l10n %}
 
 {% block title %}Insights - {{ workspace.name }} - Jobz Social Media{% endblock %}
 
@@ -48,7 +49,7 @@
         <select name="channel" onchange="this.form.submit()" class="ml-auto text-sm px-3 py-1.5 rounded-full border border-stone-200 bg-white">
             <option value="">Todos os canais</option>
             {% for channel in channels %}
-            <option value="{{ channel.id }}" {% if selected_channel == channel.id|stringformat:"s" %}selected{% endif %}>{{ channel.account_name }} · {{ channel.get_platform_display }}</option>
+            <option value="{{ channel.id }}" {% if selected_channel == channel.id|stringformat:"s" %}selected{% endif %}>{{ channel.account_name }} · {{ channel.get_platform_display }}{% if channel.connection_status != 'connected' %} · verificar conexão{% endif %}</option>
             {% endfor %}
         </select>
         <input type="hidden" name="order" value="{{ order }}">
@@ -206,6 +207,14 @@
             <div>
                 <h2 class="text-base font-semibold text-stone-900">Seguidores</h2>
                 <p class="text-xs text-stone-500 mt-0.5">{{ period.start_date|date:"d/m/Y" }} – {{ period.end_date|date:"d/m/Y" }}</p>
+                {% if can_refresh_followers %}
+                <form method="post" action="{% url 'insights:refresh_followers' workspace_id=workspace.id %}" class="mt-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="channel" value="{{ selected_channel }}">
+                    <input type="hidden" name="query" value="{{ query }}">
+                    <button type="submit" class="text-xs text-blue-700 underline cursor-pointer">Atualizar seguidores</button>
+                </form>
+                {% endif %}
             </div>
             <div class="inline-flex rounded-full bg-white border border-stone-200 p-0.5 text-sm font-medium">
                 <button type="button" @click="mode = 'bar'" :class="mode === 'bar' ? 'bg-stone-900 text-white' : 'text-stone-600'" class="px-3 py-1.5 rounded-full cursor-pointer">Barras</button>
@@ -214,30 +223,29 @@
             </div>
         </div>
         <div class="bg-white rounded-xl border border-stone-200 p-4">
-            {% if not followers.has_history %}
-            <p class="text-xs text-stone-500 mb-3">O histórico de seguidores passa a ser registrado a cada verificação das contas (a cada 6 horas). A variação aparece conforme os dias forem acumulando.</p>
-            {% endif %}
+            <p class="text-xs text-stone-500 mb-3">Os totais são os últimos registros disponíveis até o fim do período. A variação exige registros no início e depois dele; sem coleta, o total aparece como indisponível.</p>
 
             <!-- Bars: at range start + gained in range -->
             <div x-show="mode === 'bar'" class="space-y-3">
                 {% for row in followers.rows %}
                 <div class="flex items-center gap-3">
-                    <div class="w-36 flex-shrink-0 flex items-center gap-1.5 text-xs text-stone-600 truncate">
+                    <div class="w-36 flex-shrink-0 text-xs text-stone-600 truncate">
                         {% include "partials/_platform_icon.html" with platform=row.channel.platform size="sm" %}{{ row.channel.account_name }}
+                        <small class="block text-stone-500">{% if row.channel.connection_status != 'connected' %}Verificar conexão · {% endif %}{% if row.last_date %}Coletado em {{ row.last_date|date:"d/m/Y" }}{% else %}Sem coleta no histórico{% endif %}</small>
                     </div>
                     <div class="flex-1 flex items-center h-6">
-                        <div class="h-full rounded-l {% if not row.gain_width %}rounded-r{% endif %}" style="width: {{ row.start_width }}%; background: {{ row.channel.series_color }};"
+                        <div class="h-full rounded-l {% if not row.gain_width %}rounded-r{% endif %}" style="width: {{ row.start_width|unlocalize }}%; background: {{ row.channel.series_color }};"
                              title="{{ row.channel.account_name }}: {% if row.start is not None %}{{ row.start|br_number }} no início do período{% else %}{{ row.current|br_number }} seguidores{% endif %}"></div>
                         {% if row.gain_width %}
-                        <div class="h-full rounded-r ml-0.5" style="width: {{ row.gain_width }}%; background: {{ row.channel.series_color }}; opacity: .45;"
+                        <div class="h-full rounded-r ml-0.5" style="width: {{ row.gain_width|unlocalize }}%; background: {{ row.channel.series_color }}; opacity: .45;"
                              title="{{ row.channel.account_name }}: {{ row.gained|br_signed }} no período"></div>
                         {% endif %}
-                        <span class="ml-2 text-xs text-stone-600 tabular-nums whitespace-nowrap">{{ row.current|br_number }}{% if row.gained %} <span class="text-stone-400">({{ row.gained|br_signed }})</span>{% endif %}</span>
+                        <span class="ml-2 text-xs text-stone-600 tabular-nums whitespace-nowrap">{% if row.current is None %}Indisponível{% else %}{{ row.current|br_number }}{% endif %}{% if row.gained is not None %} <span class="{% if row.gained < 0 %}text-red-600{% else %}text-stone-400{% endif %}">({{ row.gained|br_signed }})</span>{% endif %}</span>
                     </div>
                 </div>
                 {% endfor %}
                 <div class="flex items-center gap-4 pt-2 text-xs text-stone-500">
-                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-stone-600"></span>No início do período</span>
+                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-stone-600"></span>Base disponível</span>
                     <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-stone-600 opacity-45"></span>Ganhos no período</span>
                 </div>
             </div>
@@ -257,7 +265,7 @@
                     {% for line in followers.line.lines %}
                     <polyline points="{{ line.path }}" fill="none" stroke="{{ line.channel.series_color }}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
                     {% for point in line.points %}
-                    <circle cx="{{ point.x }}" cy="{{ point.y }}" r="4" fill="{{ line.channel.series_color }}" stroke="#fff" stroke-width="2">
+                    <circle cx="{{ point.x|unlocalize }}" cy="{{ point.y|unlocalize }}" r="4" fill="{{ line.channel.series_color }}" stroke="#fff" stroke-width="2">
                         <title>{{ line.channel.account_name }} · {{ point.date|date:"d/m" }}: {{ point.value|br_number }}</title>
                     </circle>
                     {% endfor %}
@@ -341,6 +349,7 @@
         No Facebook, a coleta atual inclui reações, comentários e compartilhamentos quando disponíveis.
         A importação de posts antigos está disponível apenas para Instagram. Stories têm métricas só nas
         primeiras 24h. A variação de seguidores depende dos registros diários coletados pelo sistema.
+        Contas com erro ou desconectadas mantêm o histórico visível, mas podem ter números desatualizados.
     </p>
 </div>
 

@@ -1,6 +1,7 @@
 """Background tasks for social account health checks."""
 
 import logging
+import zoneinfo
 from datetime import timedelta
 
 from background_task import background
@@ -60,6 +61,8 @@ def check_social_account_health(account_id: str):
         credentials = {**credentials, "ig_user_id": account.account_platform_id}
     elif account.platform == "linkedin_company":
         credentials = {**credentials, "organization_id": account.account_platform_id}
+    elif account.platform == "facebook":
+        credentials = {**credentials, "page_id": account.account_platform_id}
 
     try:
         provider = get_provider(account.platform, credentials)
@@ -93,7 +96,7 @@ def check_social_account_health(account_id: str):
             account.avatar_url = profile.avatar_url
         FollowerSnapshot.objects.update_or_create(
             social_account=account,
-            date=timezone.localdate(),
+            date=timezone.now().astimezone(zoneinfo.ZoneInfo(account.workspace.effective_timezone or "UTC")).date(),
             defaults={"followers": profile.follower_count},
         )
         if account.connection_status != SocialAccount.ConnectionStatus.TOKEN_EXPIRING:

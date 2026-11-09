@@ -162,13 +162,16 @@ class FacebookProvider(SocialProvider):
     # ------------------------------------------------------------------
 
     def get_profile(self, access_token: str) -> AccountProfile:
+        page_id = self.credentials.get("page_id")
         resp = self._request(
             "GET",
-            f"{BASE_URL}/me",
+            f"{BASE_URL}/{page_id or 'me'}",
             access_token=access_token,
-            params={"fields": "id,name,picture"},
+            params={"fields": "id,name,picture,followers_count" if page_id else "id,name,picture"},
         )
         data = resp.json()
+        if page_id and (str(data.get("id")) != str(page_id) or data.get("followers_count") is None):
+            raise APIError("Facebook did not return the page's follower count.", platform=self.platform_name)
         avatar = None
         if "picture" in data and "data" in data["picture"]:
             avatar = data["picture"]["data"].get("url")
@@ -176,6 +179,7 @@ class FacebookProvider(SocialProvider):
             platform_id=data["id"],
             name=data.get("name", ""),
             avatar_url=avatar,
+            follower_count=int(data.get("followers_count", 0)),
             extra=data,
         )
 

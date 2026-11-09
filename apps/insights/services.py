@@ -108,24 +108,26 @@ def _delta(current, previous):
     return round((current - previous) / previous * 100, 1)
 
 
+def accounts_for_insights(workspace):
+    """Connection health must not hide an account's saved analytics history."""
+    return SocialAccount.objects.filter(workspace=workspace).order_by("platform", "account_name", "id")
+
+
 def summary(workspace, period, account_id=None):
     """Return the summary cards: value + % change vs the previous period."""
     current = _totals(published_posts(workspace, period.start, period.end, account_id))
     previous = _totals(published_posts(workspace, period.prev_start, period.prev_end, account_id))
 
-    accounts = SocialAccount.objects.filter(
-        workspace=workspace, connection_status=SocialAccount.ConnectionStatus.CONNECTED
-    )
-    if account_id:
-        accounts = accounts.filter(id=account_id)
-    followers = accounts.aggregate(total=Sum("follower_count"))["total"] or 0
-    gains = [row["gained"] for row in followers_by_channel(workspace, period, account_id)["rows"] if row["gained"] is not None]
-    followers_gained = sum(gains) if gains else None
+    follower_rows = followers_by_channel(workspace, period, account_id)["rows"]
+    totals = [row["current"] for row in follower_rows]
+    gains = [row["gained"] for row in follower_rows]
+    followers = sum(totals) if totals and all(value is not None for value in totals) else None
+    followers_gained = sum(gains) if gains and all(value is not None for value in gains) else None
 
     cards = [
         ("Posts", current["posts"], _delta(current["posts"], previous["posts"]), "Publicações do período (feitas pelo sistema ou importadas do Instagram)."),
-        ("Seguidores", followers, None, "Total atual das contas conectadas; a variação mostra os seguidores ganhos no período."),
-        ("Reações", current["likes"], _delta(current["likes"], previous["likes"]), "Curtidas (Instagram) dos posts do período."),
+        ("Seguidores", followers, None, "Último total disponível até o fim do período. O total e a variação exigem dados de todos os canais selecionados; conexões com erro podem ter dados desatualizados."),
+        ("Reações", current["likes"], _delta(current["likes"], previous["likes"]), "Curtidas e reações registradas nos posts do período."),
         ("Comentários", current["comments"], _delta(current["comments"], previous["comments"]), "Comentários nos posts do período."),
         (
             "Taxa de engajamento",
@@ -195,12 +197,8 @@ FORMATS = [("post", "Post"), ("reel", "Reel"), ("story", "Story"), ("carousel", 
 
 
 def channels_for(workspace, account_id=None):
-    """Connected channels in a stable order; each keeps its color whatever the filter."""
-    channels = list(
-        SocialAccount.objects.filter(
-            workspace=workspace, connection_status=SocialAccount.ConnectionStatus.CONNECTED
-        ).order_by("platform", "account_name", "id")
-    )
+    """Workspace channels in a stable order, including saved history of unhealthy connections."""
+    channels = list(accounts_for_insights(workspace))
     for index, channel in enumerate(channels):
         channel.series_color = SERIES_COLORS[index % len(SERIES_COLORS)]
     if account_id:
@@ -257,37 +255,38 @@ def posts_by_channel(workspace, period, account_id=None):
 def followers_by_channel(workspace, period, account_id=None):
     """Followers at range start, gained in range and a daily series per channel.
 
-    Uses FollowerSnapshot (recorded by the health check); today's point is the
-    live ``follower_count``. Channels without history only show the current value.
+    Uses observed snapshots, never synthetic daily points. A positive cached
+    total is a fallback only for a period containing today, without growth.
     """
     from apps.social_accounts.models import FollowerSnapshot
 
     start_date, end_date = period.start_date, period.end_date
-    today = timezone.localdate()
+    today = timezone.now().astimezone(zoneinfo.ZoneInfo(workspace.effective_timezone or "UTC")).date()
     rows = []
     for channel in channels_for(workspace, account_id):
         snapshots = FollowerSnapshot.objects.filter(social_account=channel)
         baseline = snapshots.filter(date__lte=start_date).order_by("-date").first()
-        if baseline is None:
-            baseline = snapshots.filter(date__gte=start_date, date__lte=end_date).order_by("date").first()
         series = {s.date: s.followers for s in snapshots.filter(date__gte=start_date, date__lte=end_date)}
-        if start_date <= today <= end_date:
-            series[today] = channel.follower_count
-        current = series[max(series)] if series else channel.follower_count
+        latest = snapshots.filter(date__lte=end_date).order_by("-date").first()
+        current = latest.followers if latest else None
+        if latest is None and start_date <= today <= end_date and channel.follower_count > 0:
+            current = channel.follower_count
         start_value = baseline.followers if baseline else None
+        comparable = baseline and latest and latest.date > baseline.date and latest.date >= start_date
         rows.append(
             {
                 "channel": channel,
                 "start": start_value,
                 "current": current,
-                "gained": current - start_value if start_value is not None else None,
+                "gained": current - start_value if comparable else None,
+                "last_date": latest.date if latest else None,
                 "series": sorted(series.items()),
             }
         )
-    top = max((max(row["current"], row["start"] or 0) for row in rows), default=0) or 1
+    top = max((max(row["current"] or 0, row["start"] or 0) for row in rows), default=0) or 1
     for row in rows:
-        base = row["start"] if row["start"] is not None else row["current"]
-        row["start_width"] = round(min(base, row["current"]) / top * 100, 1)
+        base = row["start"] if row["start"] is not None else row["current"] or 0
+        row["start_width"] = round(min(base, row["current"] or 0) / top * 100, 1)
         row["gain_width"] = round(max(row["gained"] or 0, 0) / top * 100, 1)
     return {"rows": rows, "max": top, "line": _line_chart(rows, start_date, end_date), "has_history": any(r["start"] is not None for r in rows)}
 
